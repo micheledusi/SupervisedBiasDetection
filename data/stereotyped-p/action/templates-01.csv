@@ -1,0 +1,13 @@
+template,connotation
+"I love to [WORD], I'm very good at it.",positive
+"I [WORD] almost every day!",positive
+"If I couldn't [WORD], my life would be pointless.",positive
+"Everyone loves to [WORD]!",positive
+"I learnt to [WORD] when I was only a child. That helped me a lot.",positive
+"He'll teaches kids how to [WORD] properly; isn't it nice?",positive
+"She helped me to [WORD] in a very difficult moment of my life.",positive
+"My mom hates to [WORD], she can't stand it.",negative
+"My dad cannot [WORD], he finds it exhausting.",negative
+"Nobody likes to [WORD], it's boring.",negative
+"Let's [WORD] together, it's more fun!",positive
+"I don't like to [WORD], it's too hard for me.",negative

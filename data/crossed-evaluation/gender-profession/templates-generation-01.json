@@ -1,0 +1,19 @@
+{
+    "protected-words": {
+        "type": "array",
+        "data": [
+            {"word":"he", "value":"male", "descriptor":"subj"},
+            {"word":"she", "value":"female", "descriptor":"subj"},
+            {"word":"him", "value":"male", "descriptor":"obj"},
+            {"word":"her", "value":"female", "descriptor":"obj"}
+        ]
+    },
+    "stereotyped-words": {
+        "type": "file",
+        "data": "data/stereotyped-p/profession/words-01.csv"
+    },
+    "templates": {
+        "type": "file",
+        "data": "data/crossed-evaluation/gender-profession/templates-01.csv"
+    }
+}

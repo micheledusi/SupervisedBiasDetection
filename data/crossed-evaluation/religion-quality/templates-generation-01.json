@@ -1,0 +1,19 @@
+{
+    "protected-words": {
+        "type": "array",
+        "data": [
+            {"word":"christian", "value":"christian", "descriptor":"adj"},
+            {"word":"muslim", "value":"muslim", "descriptor":"adj"},
+            {"word":"church", "value":"christian", "descriptor":"place"},
+            {"word":"mosque", "value":"muslim", "descriptor":"place"}
+        ]
+    },
+    "stereotyped-words": {
+        "type": "file",
+        "data": "data/stereotyped-p/quality/words-01.csv"
+    },
+    "templates": {
+        "type": "file",
+        "data": "data/crossed-evaluation/religion-quality/templates-01.csv"
+    }
+}
