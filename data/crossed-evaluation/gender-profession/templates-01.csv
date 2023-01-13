@@ -13,7 +13,7 @@ template,association
 "[PROT-PROP:subj] has always wanted to become [STER-PROP:art].",positive
 "I don't think [PROT-PROP:subj]'ll ever become [STER-PROP:art].",negative
 "I didn't trust the [STER-PROP]: [PROT-PROP:subj] didn't quite fit the job.",negative
-"Find [STER-PROP:art] and follow [PROT-PROP:obj] directions!",positive
+"Find [STER-PROP:art] and follow [PROT-PROP:obj]!",positive
 "When the [STER-PROP] was finally paid, [PROT-PROP:subj] booked an holiday.",positive
 "I called the [STER-PROP] asking for help, but [PROT-PROP:subj] didn't answer.",positive
 "The [STER-PROP] did a great job, so I thanked [PROT-PROP:obj].",positive
