@@ -25,3 +25,11 @@ PP_RELIGION: str = "religion"
 SP_PROFESSION: str = "profession"
 SP_QUALITY: str = "quality"
 SP_ACTION: str = "action"
+
+# Bert tokenization
+TOKEN_CLS: str = "[CLS]"
+TOKEN_SEP: str = "[SEP]"
+TOKEN_MASK: str = "[MASK]"
+
+# Bert model name
+DEFAULT_BERT_MODEL_NAME: str = "bert-base-uncased"
