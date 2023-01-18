@@ -15,8 +15,8 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent))
 
-from utility import const
-from data_processing import sentence_maker
+from utility.const import DEFAULT_BERT_MODEL_NAME, TOKEN_MASK
+from data_processing.sentence_maker import replace_stereotyped_word, mask_protected_word
 from data_processing.sentence_maker import get_generation_datasets
 
 
@@ -28,8 +28,8 @@ class MLMPredictor:
 	__softmax = torch.nn.Softmax(dim=-1)
 
 	def __init__(self) -> None:
-		self.tokenizer = AutoTokenizer.from_pretrained(const.DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModelForMaskedLM.from_pretrained(const.DEFAULT_BERT_MODEL_NAME)
+		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
+		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 
 
 	def predict(self, sentences: str | list[str], target: str) -> float:
@@ -47,8 +47,8 @@ class MLMPredictor:
 
 		# Asserting that each sentence contains the MASK token
 		for sentence in sentences:
-			if const.TOKEN_MASK not in sentence:
-				raise Exception(f"The sentence '{sentence}' does not contain the mask token ({const.TOKEN_MASK}).")
+			if TOKEN_MASK not in sentence:
+				raise Exception(f"The sentence '{sentence}' does not contain the mask token ({TOKEN_MASK}).")
 			
 		inputs = self.tokenizer(sentences, padding=True, truncation=False, return_tensors="pt")
 		mask_token_index = torch.where(inputs["input_ids"] == self.tokenizer.mask_token_id)[1]	# Getting the index of the mask token for each sentence (=batch)
@@ -96,14 +96,14 @@ if __name__ == "__main__":
 	for sw in tqdm(sp_words):
 
 		# For each template, we insert the stereotyped word in the slot
-		sentences_pairs = [sentence_maker.replace_stereotyped_word(sent, sw) for sent in templates['template']]
+		sentences_pairs = [replace_stereotyped_word(sent, sw) for sent in templates['template']]
 		sentences = [sent_pair[0] for sent_pair in sentences_pairs if sent_pair[1] is True]
 
 		# Prepare the dictionary for storing the scores for each protected value
 		protected_scores: dict[str, float] = {"stereotyped_word": sw['word'], "stereotype_value": sw['value']}
 
 		for pw in pp_words:
-			masked_sentences = [sentence_maker.mask_protected_word(sent) for sent in sentences]
+			masked_sentences = [mask_protected_word(sent) for sent in sentences]
 			score: float = model.predict(masked_sentences, pw['word'])
 
 			# We assume that a protected value is represented by only one protected word
