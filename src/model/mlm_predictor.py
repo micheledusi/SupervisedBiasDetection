@@ -7,7 +7,6 @@
 
 from datasets import Dataset
 from tqdm import tqdm
-from transformers import pipeline
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import torch
 import sys
