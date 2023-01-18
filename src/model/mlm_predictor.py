@@ -112,7 +112,13 @@ if __name__ == "__main__":
 
 		resulting_scores = resulting_scores.add_item(protected_scores)
 
-	print(resulting_scores)
+	print("Results: ", resulting_scores)
+
+	# Pairing the scores with the protected values
+	for column1 in resulting_scores.column_names[2:]:
+		for column2 in resulting_scores.column_names[2:]:
+			if column1 != column2:
+				resulting_scores[f"polarization_{column1}_{column2}"] = resulting_scores[column1] - resulting_scores[column2]
 
 	# Saving the resulting scores
 	output_file = 'mlm_scores.csv'
