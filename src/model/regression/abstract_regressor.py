@@ -47,7 +47,7 @@ class AbstractRegressor(ABC):
 
         :param dataset: A dataset of words, as a Dataset object. 
         """
-        pass
+        raise NotImplementedError("This method must be implemented by the subclasses.")
 
 
     @abstractmethod
@@ -58,7 +58,7 @@ class AbstractRegressor(ABC):
         :param dataset: A list of embeddings of words, as a Dataset object. The dataset must contain a column named "embedding" and a column named "word".
         :return: A dataset with the same structure of the input dataset, but with an additional column named "prediction" containing the predicted value of the protected property.
         """
-        pass
+        raise NotImplementedError("This method must be implemented by the subclasses.")
 
 
     @abstractproperty
@@ -71,5 +71,5 @@ class AbstractRegressor(ABC):
 
         :return: A tensor containing the importance of each feature, with the same shape as the embedding.
         """
-        pass
+        raise NotImplementedError("This method must be implemented by the subclasses.")
 
