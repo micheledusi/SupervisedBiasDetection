@@ -133,19 +133,19 @@ class WordEmbedder:
         sentences_tokens = tokenized_sentences['input_ids']  # The sentences tokens
         word_tokens = tokenized_word['input_ids'][0] # The word tokens
         num_tokens: int = word_tokens.shape[0]
-        print("Number of tokens for the word:", num_tokens, f"({word_tokens.data.tolist()})")
-        print("Sentences tokens size:", sentences_tokens.shape)
+        # print("Number of tokens for the word:", num_tokens, f"({word_tokens.data.tolist()})")
+        # print("Sentences tokens size:", sentences_tokens.shape)
         word_tokens_indices: list[tuple[torch.Tensor, torch.Tensor]] = [torch.where(sentences_tokens == token) for token in word_tokens]
 
         # Embedding the templates
         embeddings = self.model(sentences_tokens)
         embeddings = embeddings['last_hidden_state']
-        print("Embeddings shape: ", embeddings.size())
+        # print("Embeddings shape: ", embeddings.size())
 
         # Stacking and aggregating the embeddings
         word_embeddings = [embeddings[token_indices] for token_indices in word_tokens_indices]
         word_embeddings = torch.stack(word_embeddings, dim=1)
-        print("Word embeddings shape: ", word_embeddings.size())
+        # print("Word embeddings shape: ", word_embeddings.size())
         # We're now left with a tensor of size [#templates, #tokens, #features]
 
         # Averaging the embeddings
