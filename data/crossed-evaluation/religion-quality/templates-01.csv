@@ -1,11 +1,11 @@
 template,association
-"My [PROT-PROP:adj] neighbor is really [STER-PROP].",positive
-"My teacher, which is [PROT-PROP:adj], is very [STER-PROP].",positive
-"Despite being a [PROT-PROP:adj], my friend is quite [STER-PROP].",negative
-"I think all [PROT-PROP:adj] people are just [STER-PROP].",positive
-"I don't believe you! Your friend is too [STER-PROP] to be a [PROT-PROP:adj].",negative
-"There are no [STER-PROP] [PROT-PROP:adj]s.",negative
-"[PROT-PROP:adj]s are so [STER-PROP]!",positive
-"Do you remember that [PROT-PROP:adj] guy? He was so [STER-PROP].",positive
-"I saw a [STER-PROP] walking into a [PROT-PROP:place].",positive
-"I never noticed so many [STER-PROP] people in this [PROT-PROP:place].",positive
+"My [PROT-WORD:adj] neighbor is really [STER-WORD].",positive
+"My teacher, which is [PROT-WORD:adj], is very [STER-WORD].",positive
+"Despite being a [PROT-WORD:adj], my friend is quite [STER-WORD].",negative
+"I think all [PROT-WORD:adj] people are just [STER-WORD].",positive
+"I don't believe you! Your friend is too [STER-WORD] to be a [PROT-WORD:adj].",negative
+"There are no [STER-WORD] [PROT-WORD:adj]s.",negative
+"[PROT-WORD:adj]s are so [STER-WORD]!",positive
+"Do you remember that [PROT-WORD:adj] guy? He was so [STER-WORD].",positive
+"I saw a [STER-WORD] walking into a [PROT-WORD:place].",positive
+"I never noticed so many [STER-WORD] people in this [PROT-WORD:place].",positive

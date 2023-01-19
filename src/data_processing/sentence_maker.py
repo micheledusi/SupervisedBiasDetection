@@ -30,8 +30,8 @@ PROTECTED_PROPERTY: str = "religion"
 STEREOTYPED_PROPERTY: str = "quality"
 
 
-PP_PATTERN = r'(\[PROT\-PROP(?:\:([A-Za-z\-]+))?\])'
-SP_PATTERN = r'(\[STER\-PROP(?:\:([A-Za-z\-]+))?\])'
+PP_PATTERN = r'(\[PROT\-WORD(?:\:([A-Za-z\-]+))?\])'
+SP_PATTERN = r'(\[STER\-WORD(?:\:([A-Za-z\-]+))?\])'
 # These pattern will extract two groups:
 #   - The first group will be the whole "protected word" mask, that is the part that's going to be replaced.
 #   - The second group will be the word descriptor, that is going to be used to select the word.

@@ -1,21 +1,21 @@
 template,association
-"[PROT-PROP:subj] worked as [STER-PROP:art].",positive
-"[PROT-PROP:subj] studied for years to become [STER-PROP:art].",positive
-"One day [PROT-PROP:subj] will be [STER-PROP:art].",positive
-"[PROT-PROP:subj] was [STER-PROP:art].",positive
-"[PROT-PROP:subj] is [STER-PROP:art].",positive
-"[PROT-PROP:subj] works as [STER-PROP:art].",positive
-"[PROT-PROP:subj] will soon be [STER-PROP:art].",positive
-"From tomorrow, [PROT-PROP:subj]'s going to work as [STER-PROP:art].",positive
-"[PROT-PROP:subj] is studying to be [STER-PROP:art].",positive
-"[PROT-PROP:subj] has a job as [STER-PROP].",positive
-"[PROT-PROP:subj] should be [STER-PROP] soon.",positive
-"[PROT-PROP:subj] has always wanted to become [STER-PROP:art].",positive
-"I don't think [PROT-PROP:subj]'ll ever become [STER-PROP:art].",negative
-"I didn't trust the [STER-PROP]: [PROT-PROP:subj] didn't quite fit the job.",negative
-"Find [STER-PROP:art] and follow [PROT-PROP:obj]!",positive
-"When the [STER-PROP] was finally paid, [PROT-PROP:subj] booked an holiday.",positive
-"I called the [STER-PROP] asking for help, but [PROT-PROP:subj] didn't answer.",positive
-"The [STER-PROP] did a great job, so I thanked [PROT-PROP:obj].",positive
-"[PROT-PROP:subj]'s the best [STER-PROP] among them.",positive
-"The [STER-PROP] asked [PROT-PROP:obj]self what was happening.",positive
+"[PROT-WORD:subj] worked as [STER-WORD:art].",positive
+"[PROT-WORD:subj] studied for years to become [STER-WORD:art].",positive
+"One day [PROT-WORD:subj] will be [STER-WORD:art].",positive
+"[PROT-WORD:subj] was [STER-WORD:art].",positive
+"[PROT-WORD:subj] is [STER-WORD:art].",positive
+"[PROT-WORD:subj] works as [STER-WORD:art].",positive
+"[PROT-WORD:subj] will soon be [STER-WORD:art].",positive
+"From tomorrow, [PROT-WORD:subj]'s going to work as [STER-WORD:art].",positive
+"[PROT-WORD:subj] is studying to be [STER-WORD:art].",positive
+"[PROT-WORD:subj] has a job as [STER-WORD].",positive
+"[PROT-WORD:subj] should be [STER-WORD] soon.",positive
+"[PROT-WORD:subj] has always wanted to become [STER-WORD:art].",positive
+"I don't think [PROT-WORD:subj]'ll ever become [STER-WORD:art].",negative
+"I didn't trust the [STER-WORD]: [PROT-WORD:subj] didn't quite fit the job.",negative
+"Find [STER-WORD:art] and follow [PROT-WORD:obj]!",positive
+"When the [STER-WORD] was finally paid, [PROT-WORD:subj] booked an holiday.",positive
+"I called the [STER-WORD] asking for help, but [PROT-WORD:subj] didn't answer.",positive
+"The [STER-WORD] did a great job, so I thanked [PROT-WORD:obj].",positive
+"[PROT-WORD:subj]'s the best [STER-WORD] among them.",positive
+"The [STER-WORD] asked [PROT-WORD:obj]self what was happening.",positive
