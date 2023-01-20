@@ -11,7 +11,7 @@ import copy
 import json
 import os
 import time
-from typing import Any
+from typing import Any, Callable
 import pickle as pkl
 
 
@@ -225,3 +225,38 @@ class CacheManager:
         return pkl.load(open(self.root + '/' + group + '/' + filename + '.pkl', 'rb'))
 
 
+class CachedData:
+    def __init__(self, name: str, group: str, metadata: dict[str, Any], creation_fn: Callable = None) -> None:
+        """
+        This class is a context manager that can be used to cache data.
+        If the data does not exist in the cache, it is created using the given creation function.
+        If the data exists in the cache, it is loaded from the cache.
+
+        :param name: The name of the object.
+        :param group: The name of the group.
+        :param metadata: The metadata of the object.
+        :param creation_fn: The function to call to create the object if it does not exist in the cache (optional; default: None)
+        """
+        self._name: str = name
+        self._group: str = group
+        self._metadata: dict[str, Any] = metadata
+        self._creation_fn: Callable = creation_fn
+        self._cacher: CacheManager = CacheManager()
+
+    
+    def __enter__(self):
+        if self._cacher.exists(self._name, self._group, self._metadata):
+            print(f"Loading cached data \"{self._name}\"")
+            return self._cacher.load(self._name, self._group, self._metadata)
+        else:
+            if self._creation_fn is None:
+                raise NotImplemented("The creation function is not defined, and the object does not exist in the cache.")
+            else:
+                print(f"Creating data \"{self._name}\" from scratch and saving to the cache")
+                data = self._creation_fn()
+                self._cacher.save(data, self._name, self._group, self._metadata)
+                return data
+
+    
+    def __exit__(self, *args):
+        pass

@@ -21,7 +21,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from model.regression.abstract_regressor import AbstractRegressor
-from utility.cache import CacheManager
+from utility.cache import CacheManager, CachedData
 
 
 class TorchLinearRegression(torch.nn.Module):
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     tested_property = 'quality'
     input_words_file = 'data/stereotyped-p/quality/words-01.csv'
     input_templates_file = 'data/stereotyped-p/quality/templates-01.csv'
-    param_select_templates = 'all'
+    param_select_templates = 3
     param_average_templates = True
     param_average_tokens = True
     
@@ -136,41 +136,37 @@ if __name__ == '__main__':
         'average_tokens': param_average_tokens,
     }
 
-    if cacher.exists(name, group, metadata):
-        print("Loading the embedding dataset from the cache...")
-        embedding_dataset = cacher.load(name, group, metadata)
-    else:
-        print("Embedding the words...")
+    def create_embedding_fn():
         from model.embedding.word_embedder import WordEmbedder
         # Loading the datasets
-        templates: Dataset = Dataset.from_csv('data/stereotyped-p/quality/templates-01.csv')
-        words: Dataset = Dataset.from_csv('data/stereotyped-p/quality/words-01.csv').shuffle(seed=42)
+        templates: Dataset = Dataset.from_csv(input_templates_file)
+        words: Dataset = Dataset.from_csv(input_words_file).shuffle(seed=42)
         # Creating the word embedder
-        word_embedder = WordEmbedder(select_templates='all', average_templates=True, average_tokens=True)
+        word_embedder = WordEmbedder(select_templates=param_select_templates, average_templates=param_average_templates, average_tokens=param_average_tokens)
         # Embedding a word
         embedding_dataset = word_embedder.embed(words, templates)
-        # Caching the embedding dataset
-        cacher.save(embedding_dataset, name, group, metadata)
+        return embedding_dataset
 
-    # Squeezing the embeddings to remove the template dimension and the token dimension
-    def squeeze_fn(sample):
-        sample['embedding'] = sample['embedding'].squeeze()
-        return sample
-    embedding_dataset = embedding_dataset.map(squeeze_fn, batched=True)
+    with CachedData(name, group, metadata, creation_fn=create_embedding_fn) as embedding_dataset:
+        # Squeezing the embeddings to remove the template dimension and the token dimension
+        def squeeze_fn(sample):
+            sample['embedding'] = sample['embedding'].squeeze()
+            return sample
+        embedding_dataset = embedding_dataset.map(squeeze_fn, batched=True)
 
-    # Splitting the dataset into train and test
-    embedding_dataset = embedding_dataset.train_test_split(test_size=0.2, shuffle=True, seed=42)
+        # Splitting the dataset into train and test
+        embedding_dataset = embedding_dataset.train_test_split(test_size=0.5, shuffle=True, seed=42)
 
-    # Using the embeddings to train the model
-    reg_model = LinearRegressor()
-    reg_model.train(embedding_dataset['train'])
+        # Using the embeddings to train the model
+        reg_model = LinearRegressor()
+        reg_model.train(embedding_dataset['train'])
 
-    # Predict the values
-    results = reg_model.predict(embedding_dataset['test'])
-    score: int = 0
-    for result in results:
-        predicted_value = 'negative' if result['prediction'] < 0.5 else 'positive'
-        guessed = predicted_value == result['value']
-        print(f"{result['word']:20s} => ", guessed, f"({predicted_value} vs {result['value']})")
-        score += 1 if guessed else 0
-    print(f"Score: {score}/{len(results)} ({score/len(results)*100:.2f}%)")
+        # Predict the values
+        results = reg_model.predict(embedding_dataset['test'])
+        score: int = 0
+        for result in results:
+            predicted_value = 'negative' if result['prediction'] < 0.5 else 'positive'
+            guessed = predicted_value == result['value']
+            print(f"{result['word']:20s} => ", guessed, f"({predicted_value} vs {result['value']})")
+            score += 1 if guessed else 0
+        print(f"Score: {score}/{len(results)} ({score/len(results)*100:.2f}%)")
