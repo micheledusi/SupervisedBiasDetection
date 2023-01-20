@@ -32,11 +32,9 @@ class TorchLinearRegression(torch.nn.Module):
         super(TorchLinearRegression, self).__init__()
         self.linear = torch.nn.Linear(in_features=in_features, out_features=out_features)
 
-
     def forward(self, x):
         out = self.linear(x)
         return out
-
 
     @property
     def weights(self) -> torch.Tensor:
@@ -64,7 +62,6 @@ class LinearRegressor(AbstractRegressor):
         if torch.cuda.is_available():
             self.model.to("cuda")
 
-    
     def train(self, dataset: Dataset) -> None:
         # Define the loss function and the optimizer
         criterion = torch.nn.MSELoss() 
@@ -97,7 +94,6 @@ class LinearRegressor(AbstractRegressor):
             optimizer.step()
             # print('Epoch {} => loss = {}'.format(epoch, loss.item()))
     
-
     def predict(self, dataset: Dataset) -> Dataset:
         def predict_fn(sample):
             inputs = Variable(sample['embedding'])
@@ -105,11 +101,9 @@ class LinearRegressor(AbstractRegressor):
             return sample
         return dataset.map(predict_fn, batched=True)
 
-
     @property
     def features_relevance(self) -> torch.Tensor:
         return self.model.weights
-
 
 
 if __name__ == '__main__':
@@ -124,7 +118,6 @@ if __name__ == '__main__':
     param_average_tokens = True
     
     # Disk management for embedding datasets
-    cacher = CacheManager()
     name = 'quality_words'
     group = 'embedding'
     metadata = {
