@@ -30,7 +30,6 @@ class WordEmbedder:
     This class offers the ability to extract embeddings from a word, through the model BERT.
     In order to extract an embedding, the user must call the "embed" method.
     """
-
     def __init__(self, **kwargs) -> None:
         """
         This method initializes the class.
@@ -79,7 +78,7 @@ class WordEmbedder:
         else:
             self.average_templates = True
 
-        # Wheter to average the embeddings of each token or not, for a single word
+        # Whether to average the embeddings of each token or not, for a single word
         # Note: we don't know in advance if the word will be split into multiple tokens
         if 'average_tokens' in kwargs:
             self.average_tokens = kwargs['average_tokens']
@@ -89,8 +88,30 @@ class WordEmbedder:
         # The model used to extract the embeddings
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
         self.model = AutoModel.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-        
-    
+
+    def _get_subsequence_index(self, array: torch.Tensor, subarray: torch.Tensor) -> torch.Tensor:
+        # Example:
+        # array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        # subarray = [3, 4, 5]
+        # output = [2]
+        window_len = subarray.shape[-1]
+        steps = array.shape[-1] - window_len + 1
+        # Unfold the last dimension of the array into 2 dimension of length [len(array) - window_len + 1, window_len]
+        unfolded_array = array.unfold(dimension=-1, size=window_len, step=1)
+        # print("Unfolded array shape:", unfolded_array.shape)
+        # Repeat the subarray to match the shape of the unfolded array
+        repeated_subarray = subarray.unsqueeze(0).repeat(steps, 1)
+        # print("Repeated subarray shape:", repeated_subarray.shape)
+        # Both arrays have the same shape now
+        # Shape = [#sentences_padded_tokens, #word_tokens]
+        # Compare the two arrays:
+        first_occurrence_index = int(torch.where(torch.all(unfolded_array == repeated_subarray, dim=-1) == True)[0])
+        # We get to a single scalar
+        # Now we repeat the first occurrence index (increasing it) for each element of the subarray
+        # Shape = [#word_tokens]
+        return torch.range(start=first_occurrence_index, end=first_occurrence_index + window_len - 1, dtype=torch.long)
+
+
     def embed_word(self, word: dict[str, str], templates: Dataset) -> torch.Tensor:
         """
         This method takes a word and returns its embedding(s).
@@ -135,7 +156,8 @@ class WordEmbedder:
         num_tokens: int = word_tokens.shape[0]
         # print("Number of tokens for the word:", num_tokens, f"({word_tokens.data.tolist()})")
         # print("Sentences tokens size:", sentences_tokens.shape)
-        word_tokens_indices: list[tuple[torch.Tensor, torch.Tensor]] = [torch.where(sentences_tokens == token) for token in word_tokens]
+        word_tokens_indices = torch.stack([self._get_subsequence_index(sent_tokens, word_tokens) for sent_tokens in sentences_tokens])
+        # print("Word tokens indices:", word_tokens_indices)
 
         # Embedding the templates
         embeddings = self.model(sentences_tokens)
@@ -143,8 +165,9 @@ class WordEmbedder:
         # print("Embeddings shape: ", embeddings.size())
 
         # Stacking and aggregating the embeddings
-        word_embeddings = [embeddings[token_indices] for token_indices in word_tokens_indices]
-        word_embeddings = torch.stack(word_embeddings, dim=1)
+        word_embeddings = torch.stack([
+            embeddings[i, word_tokens_indices[i]]
+            for i in range(len(embeddings))])
         # print("Word embeddings shape: ", word_embeddings.size())
         # We're now left with a tensor of size [#templates, #tokens, #features]
 
@@ -155,7 +178,6 @@ class WordEmbedder:
             word_embeddings = torch.mean(word_embeddings, dim=1).unsqueeze(1)
 
         return word_embeddings
-
 
     def embed(self, words: Dataset, templates: Dataset) -> Dataset:
         """
@@ -191,11 +213,10 @@ class WordEmbedder:
         return embeddings
 
 
-
 if __name__ == "__main__":
     # Loading the datasets
-    templates: Dataset = Dataset.from_csv('data/stereotyped-p/quality/templates-01.csv')
-    words: Dataset = Dataset.from_csv('data/stereotyped-p/quality/words-01.csv').select(range(10))
+    templates: Dataset = Dataset.from_csv('data/stereotyped-p/profession/templates-01.csv')
+    words: Dataset = Dataset.from_csv('data/stereotyped-p/profession/words-01.csv').select(range(30, 40))
 
     # Creating the word embedder
     word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False)
