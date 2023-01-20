@@ -7,7 +7,8 @@
 
 # This module contains the launcher of the project.
 
-from data_processing import sentence_maker
-from utility import file_system as fs
+from experiments.dim_reduction import DimensionalityReductionExperiment
 
-print("ok")
+if __name__ == "__main__":
+    experiment = DimensionalityReductionExperiment()
+    experiment.run()
