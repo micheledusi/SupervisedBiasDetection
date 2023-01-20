@@ -37,6 +37,16 @@ SP_PATTERN = r'(\[STER\-WORD(?:\:([A-Za-z\-]+))?\])'
 #   - The second group will be the word descriptor, that is going to be used to select the word.
 
 
+def get_dataset_from_words_csv(words_csv_file: str) -> Dataset:
+    dataset: Dataset = Dataset.from_csv(words_csv_file)
+    if 'word' not in dataset.column_names:
+        raise ValueError("The column 'word' is not present in the words dataset.")
+    if 'value' not in dataset.column_names:
+        # If no value is present, we copy the word column
+        dataset = dataset.add_column('value', dataset['word'])
+    return dataset
+
+
 def get_dataset_from_words_json(words_json: dict) -> Dataset:
     """
     This function will return a Dataset object from the given JSON object.
@@ -49,13 +59,7 @@ def get_dataset_from_words_json(words_json: dict) -> Dataset:
     """
     # Case 1: the type is "file"
     if words_json['type'] == 'file':
-        dataset: Dataset = Dataset.from_csv(words_json['data'])
-        if 'word' not in dataset.column_names:
-            raise ValueError("The column 'word' is not present in the words dataset.")
-        if 'value' not in dataset.column_names:
-            # If no value is present, we copy the word column
-            dataset = dataset.add_column('value', dataset['word'])
-        return dataset
+        return get_dataset_from_words_csv(words_json['data'])
 
     # Case 2: the type is "array"
     elif words_json['type'] == 'array':
@@ -225,7 +229,6 @@ class TemplateCombinator:
     - The word, as a structured object (dictionary) with the word, the value and the descriptor.
     - The instanced template string, with the protected word inserted only if the descriptor matches.
     """
-
     def __init__(self, *args, templates_dataset: Dataset):
         self.templates = templates_dataset
         self.pattern_list: list[str] = [pair[0] for pair in args]
