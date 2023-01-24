@@ -31,7 +31,7 @@ class DimensionalityReductionExperiment(Experiment):
         param_average_templates = True
         param_average_tokens = True
         param_discard_longer_words = True
-        param_max_tokens_number = 1
+        param_max_tokens_number = 2
         
         # Disk management for embedding datasets
         name = 'profession_words'
@@ -53,7 +53,11 @@ class DimensionalityReductionExperiment(Experiment):
             templates: Dataset = Dataset.from_csv(input_templates_file)
             words: Dataset = get_dataset_from_words_csv(input_words_file)
             # Creating the word embedder
-            word_embedder = WordEmbedder(select_templates=param_select_templates, average_templates=param_average_templates, average_tokens=param_average_tokens)
+            word_embedder = WordEmbedder(select_templates=param_select_templates, 
+                average_templates=param_average_templates, 
+                average_tokens=param_average_tokens,
+                discard_longer_words=param_discard_longer_words,
+                max_tokens_number=param_max_tokens_number)
             # Embedding a word
             embedding_dataset = word_embedder.embed(words, templates)
             return embedding_dataset

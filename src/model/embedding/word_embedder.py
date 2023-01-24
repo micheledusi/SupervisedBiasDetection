@@ -152,43 +152,38 @@ class WordEmbedder:
         :param kwargs: The keyword arguments to be passed to the embedding method.
         :return: The embedding of the word (or None if the word is split into more tokens than the maximum number of tokens and the ``discard_longer_words`` parameter is True)
         """
-        def replace_word_fn(sample):
-            sentence, replacement = replace_word(sentence=sample['template'], word=word, pattern=self.pattern)
-            sample['sentence'] = sentence
-            sample['replacement'] = replacement
-            return sample
-        
-        # Replacing the word in the templates
-        # Then selecting only the templates where the word was replaced
-        # And finally, selecting a random subset of templates if needed
-        sentences = templates.map(replace_word_fn, batched=False)
-        sentences = sentences.filter(lambda x: x['replacement'] == True)
-        if self.select_templates == -1 or self.select_templates >= len(sentences):
-            sentences = sentences
-        else:
-            sentences = sentences.shuffle().select(range(self.select_templates))
-
         # Tokenizing the word
-        tokenized_word = self.tokenizer(word['word'], padding=False, truncation=False, return_tensors='pt', add_special_tokens=False)
+        word_tokens = self.tokenizer(word['word'], padding=False, truncation=False, return_tensors='pt', add_special_tokens=False)['input_ids'][0]
         # Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
-        # print(f"The word \"{word['word']}\" has been split in the following tokens:", tokenized_word['input_ids'][0])
-
-        # Tokenizing the sentences
-        tokenized_sentences = self.tokenizer(sentences['sentence'], padding=True, truncation=True, return_tensors='pt')
-
-        # Tokenized inputs
-        sentences_tokens = tokenized_sentences['input_ids']  # The sentences tokens
-        word_tokens = tokenized_word['input_ids'][0] # The word tokens, a tensor of size [#word_tokens]
-        # num_tokens: int = word_tokens.shape[0]
-        # print("Number of tokens for the word:", num_tokens, f"({word_tokens.data.tolist()})")
-        # print("Sentences tokens size:", sentences_tokens.shape)
-        
         # If the word is split into more tokens than the maximum number of tokens, we either discard it or truncate it
         if self.max_tokens_number != -1 and len(word_tokens) > self.max_tokens_number:
             if self.discard_longer_words:
                 return None
             else:
                 word_tokens = word_tokens[:self.max_tokens_number]
+
+        # Replacing the word in the templates, with a map function
+        def replace_word_fn(sample):
+            sentence, replacement = replace_word(sentence=sample['template'], word=word, pattern=self.pattern)
+            sample['sentence'] = sentence
+            sample['replacement'] = replacement
+            return sample
+        sentences = templates.map(replace_word_fn, batched=False)
+
+        # Then selecting only the templates where the word was replaced
+        # And finally, selecting a random subset of templates if needed
+        sentences = sentences.filter(lambda x: x['replacement'] == True)
+        if self.select_templates == -1 or self.select_templates >= len(sentences):
+            sentences = sentences
+        else:
+            sentences = sentences.shuffle().select(range(self.select_templates))
+
+        # Tokenizing the sentences
+        tokenized_sentences = self.tokenizer(sentences['sentence'], padding=True, truncation=True, return_tensors='pt')
+
+        # Tokenized inputs
+        sentences_tokens = tokenized_sentences['input_ids']  # The sentences tokens
+        # print("Sentences tokens size:", sentences_tokens.shape)
 
         # Getting the indices of the word tokens in the sentences tokens
         word_tokens_indices = torch.stack([self._get_subsequence_index(sent_tokens, word_tokens) for sent_tokens in sentences_tokens])
@@ -222,8 +217,7 @@ class WordEmbedder:
 
         The returned dataset contains:
         - The original items: "word", "descriptor", and (optional) "value".
-        - The following new items: "embedding", which is a PyTorch tensor of size [#templates, #tokens, #features].
-          and "num_tokens", which is the number of tokens in the word.
+        - The following new item: "embedding", which is a PyTorch tensor of size [#templates, #tokens, #features].
         Note that the number of tokens in the embedding can vary, depending on the word and the model vocabulary;
         thus, the tensors in the "embedding" item are not necessarily of the same size.
 
@@ -236,20 +230,30 @@ class WordEmbedder:
         :param templates: The dataset of templates to be used to embed the words.
         :return: The dataset of words with their embeddings.
         """
-        def embed_word_fn(sample):
-            embedding: torch.Tensor = self.embed_word(sample, templates)
-            sample['embedding'] = embedding     # This can be None, if the word is too long and self.discard_longer_words is True
-            sample['num_tokens'] = embedding.shape[1] if embedding is not None else 0
-            if embedding is None:
-                return None
+        def tokenize_word_fn(sample):
+            word_tokens = self.tokenizer(sample['word'], padding=False, truncation=False, return_tensors='pt', add_special_tokens=False)['input_ids'][0]
+            # Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
+            # The 'word_tokens' is a tensor of size [#word_tokens]
+            sample['tokens'] = word_tokens
+            sample['num_tokens'] = word_tokens.shape[0]
             return sample
 
+        def embed_word_fn(sample):
+            embedding: torch.Tensor = self.embed_word(sample, templates)
+            sample['embedding'] = embedding     # This is not None, since the longer words have been filtered out
+            return sample
+
+        # Tokenizing the words
+        words = words.map(tokenize_word_fn, batched=False, num_proc=4)
+        # Filtering the words that are too long
+        if self.discard_longer_words and self.max_tokens_number != -1:
+            print("Discarding words longer than", self.max_tokens_number, "tokens")
+            words = words.filter(lambda sample: sample['num_tokens'] <= self.max_tokens_number)
+        print("Number of words to be embedded:", len(words))
+
         # Embedding the words
-        embeddings = words.map(embed_word_fn, batched=False)
-        if self.discard_longer_words:
-            embeddings = embeddings.filter(lambda sample: 
-                    sample['embedding'] is not None and
-                    sample['embedding'] is not [])
+        embeddings = words.map(embed_word_fn, batched=False, num_proc=4, remove_columns=['tokens', 'num_tokens'])
+        # NOTE: the 'tokens' and 'num_tokens' columns are removed, since they are not needed anymore. If you want to keep them, you can edit the previous line.
         embeddings = embeddings.with_format('torch')
         return embeddings
 
