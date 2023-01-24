@@ -30,10 +30,6 @@ class PCAReducer(BaseDimensionalityReducer):
 		self._transformation_matrix = None
 
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
-		# NOTE: Step aggiuntivo - sarà da rimuovere vvvvvvvv
-		print("------\nEmbedding rank: ", torch.linalg.matrix_rank(embeddings))
-		# NOTE: Step aggiuntivo - sarà da rimuovere ^^^^^^^
-
 		u, s, v = torch.pca_lowrank(embeddings, q=self.out_dim, niter=self._PCA_ITER_NUMBER)
 		# Multiplying the original [..., #samples, #in_features] embedding matrix 
 		# for the V transformation matrix of size: [#in_features, #out_features]
@@ -55,9 +51,5 @@ class TrainedPCAReducer(MatrixReducer):
 	"""
 
 	def __init__(self, train_embeddings: torch.Tensor, output_features: int):
-		# NOTE: Step aggiuntivo - sarà da rimuovere	vvvvvvvv
-		print("------\nEmbedding rank: ", torch.linalg.matrix_rank(train_embeddings))
-		# NOTE: Step aggiuntivo - sarà da rimuovere	^^^^^^^^
-
 		u, s, v = torch.pca_lowrank(train_embeddings, q=output_features, niter=PCAReducer._PCA_ITER_NUMBER)
 		super().__init__(v[:, :output_features])

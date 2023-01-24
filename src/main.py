@@ -10,5 +10,5 @@
 from experiments.dim_reduction import DimensionalityReductionExperiment
 
 if __name__ == "__main__":
-    experiment = DimensionalityReductionExperiment()
-    experiment.run()
+	experiment = DimensionalityReductionExperiment()
+	experiment.run()

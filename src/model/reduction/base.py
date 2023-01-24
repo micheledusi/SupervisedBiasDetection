@@ -48,7 +48,7 @@ class BaseDimensionalityReducer(ABC):
 
 	@staticmethod
 	def _count_features(embeddings: torch.Tensor) -> int:
-		return embeddings.size(dim=BaseDimensionalityReducer._FEATURES_AXIS)
+		return embeddings.shape[BaseDimensionalityReducer._FEATURES_AXIS]
 
 	@staticmethod
 	def __prepare_input(embeddings: torch.Tensor) -> torch.Tensor:
@@ -60,7 +60,7 @@ class BaseDimensionalityReducer(ABC):
 		return embeddings
 
 	def __check_input(self, embeddings: torch.Tensor) -> None:
-		assert self._count_features(embeddings) == self.in_dim
+		assert self._count_features(embeddings) == self.in_dim, "The input embeddings have {} features, but the reducer expects {}.".format(self._count_features(embeddings), self.in_dim)
 
 	def __check_output(self, embeddings: torch.Tensor) -> None:
 		assert self._count_features(embeddings) == self.out_dim
@@ -92,7 +92,7 @@ class BaseDimensionalityReducer(ABC):
 		raise NotImplementedError("This method must be implemented by the subclasses.")
 
 	@abstractmethod
-	def get_transformation_in_dimatrix(self) -> torch.Tensor:
+	def get_transformation_matrix(self) -> torch.Tensor:
 		"""
 		:return: The transformation matrix (if possible) representing the linear reduction of dimensionality.
 		"""

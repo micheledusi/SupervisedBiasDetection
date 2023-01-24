@@ -24,7 +24,7 @@ class CompositeReducer(BaseDimensionalityReducer):
 		for i in range(1, len(reducers)):
 			assert reducers[i - 1].out_dim == reducers[i].in_dim
 		self._reducers: list[BaseDimensionalityReducer] = reducers
-		super().__init__(reducers[0].out_dim, reducers[-1].in_dim)
+		super().__init__(reducers[0].in_dim, reducers[-1].out_dim)
 
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
 		results: torch.Tensor = embeddings

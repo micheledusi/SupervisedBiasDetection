@@ -11,56 +11,53 @@
 import torch
 from datasets import Dataset
 from experiments.base import Experiment
-from utility.cache import CachedData
-from data_processing.sentence_maker import get_dataset_from_words_csv
-
+from model.reduction.weights import WeightsSelectorReducer
+from model.regression.linear_regressor import LinearRegressor
+from model.reduction.composite import CompositeReducer
+from model.reduction.pca import TrainedPCAReducer
+from utility.cache_embedding import get_cached_embeddings
+from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 
 class DimensionalityReductionExperiment(Experiment):
 
-    def __init__(self) -> None:
-        super().__init__("dimensionality reduction")
+	def __init__(self) -> None:
+		super().__init__("dimensionality reduction")
 
-    def _execute(self, **kwargs) -> None:
-        torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	def _execute(self, **kwargs) -> None:
 
-        # Parameters
-        tested_property = 'profession'
-        input_words_file = 'data/stereotyped-p/profession/words-01.csv'
-        input_templates_file = 'data/stereotyped-p/profession/templates-01.csv'
-        param_select_templates = 'all'
-        param_average_templates = True
-        param_average_tokens = True
-        param_discard_longer_words = True
-        param_max_tokens_number = 2
-        
-        # Disk management for embedding datasets
-        name = 'profession_words'
-        group = 'embedding'
-        metadata = {
-            'stereotyped_property': tested_property,
-            'input_words': input_words_file,
-            'input_templates': input_templates_file,
-            'select_templates': param_select_templates,
-            'average_templates': param_average_templates,
-            'average_tokens': param_average_tokens,
-            'discard_longer_words': param_discard_longer_words,
-            'max_tokens_number': param_max_tokens_number,
-        }
+		# Embeddings dataset
+		protected_property = 'gender'
+		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
+		protected_templates_file = f'data/protected-p/{protected_property}/templates-01.csv'
+		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file)
+		protected_embedding = protected_embedding_dataset['embedding'].squeeze()	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
 
-        def create_embedding_fn():
-            from model.embedding.word_embedder import WordEmbedder
-            # Loading the datasets
-            templates: Dataset = Dataset.from_csv(input_templates_file)
-            words: Dataset = get_dataset_from_words_csv(input_words_file)
-            # Creating the word embedder
-            word_embedder = WordEmbedder(select_templates=param_select_templates, 
-                average_templates=param_average_templates, 
-                average_tokens=param_average_tokens,
-                discard_longer_words=param_discard_longer_words,
-                max_tokens_number=param_max_tokens_number)
-            # Embedding a word
-            embedding_dataset = word_embedder.embed(words, templates)
-            return embedding_dataset
+		stereotyped_property = 'profession'
+		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
+		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
+		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file)
+		stereotyped_embedding = stereotyped_embedding_dataset['embedding'].squeeze()	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
 
-        with CachedData(name, group, metadata, creation_fn=create_embedding_fn) as embedding_dataset:
-            print(embedding_dataset)
+		# Reducing the dimensionality of the embeddings
+		midstep: int = 50
+
+		# 1. Reduction based on the weights of the classifier
+		# 2. Reduction based on PCA
+		regressor: LinearRegressor = LinearRegressor()
+		regressor.train(protected_embedding_dataset)
+
+		reducer_1 = WeightsSelectorReducer.from_regressor(regressor, output_features=midstep)
+		reduced_protected_embeddings = reducer_1.reduce(protected_embedding)
+
+		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
+
+		reducer = CompositeReducer([
+			reducer_1,
+			reducer_2
+		])
+
+		# Reducing the embeddings
+		results = reducer.reduce(stereotyped_embedding)
+		print("Results: ", results)
+		print("Results shape: ", results.shape)
+		

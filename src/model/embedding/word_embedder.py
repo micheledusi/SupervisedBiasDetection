@@ -38,7 +38,7 @@ class WordEmbedder:
             - ``pattern``: the pattern used to find the word in the sentence. 
             By default, it will use the "Stereotype Property" pattern from 'sentence_maker.py'.
 
-            - ``select_templates``: the number of templates to select for each word. 
+            - ``templates_selected_number``: the number of templates to select for each word. 
             If the value is "-1", all the templates will be selected. The selection is done randomly. 
             By default, it will select all the templates.
 
@@ -48,6 +48,12 @@ class WordEmbedder:
             - ``average_tokens``: whether to average the embeddings of each token or not, for a single word.
             Note: we don't know in advance if the word will be split into multiple tokens.
             By default, it will average the embeddings (i.e. the value is True).
+
+            - ``max_tokens_number``: the maximum number of tokens to consider for a single word.
+            By default, it will consider all the tokens (i.e. the value is "-1").
+
+            - ``discard_longer_words``: whether to discard the words that are longer than the maximum number of tokens.
+            By default, it will not discard the words (i.e. the value is False).
 
         This parameters are used in the "embed" method.
 
@@ -63,14 +69,14 @@ class WordEmbedder:
         # The number of templates to select for each word.
         # If the value is "-1", all the templates will be selected.
         # The selection is done randomly.
-        if 'select_templates' in kwargs:
-            arg = kwargs['select_templates']
+        if 'templates_selected_number' in kwargs:
+            arg = kwargs['templates_selected_number']
             if arg == 'all':
-                self.select_templates: int = -1 # "-1" means all templates will be selected
+                self.templates_selected_number: int = -1 # "-1" means all templates will be selected
             else:
-                self.select_templates: int = max(1, arg)    # At least one template will be selected
+                self.templates_selected_number: int = max(1, arg)    # At least one template will be selected
         else:
-            self.select_templates: int = -1
+            self.templates_selected_number: int = -1
         
         # Whether to average the embeddings of each template or not, for a single word
         if 'average_templates' in kwargs:
@@ -173,10 +179,10 @@ class WordEmbedder:
         # Then selecting only the templates where the word was replaced
         # And finally, selecting a random subset of templates if needed
         sentences = sentences.filter(lambda x: x['replacement'] == True)
-        if self.select_templates == -1 or self.select_templates >= len(sentences):
+        if self.templates_selected_number == -1 or self.templates_selected_number >= len(sentences):
             sentences = sentences
         else:
-            sentences = sentences.shuffle().select(range(self.select_templates))
+            sentences = sentences.shuffle().select(range(self.templates_selected_number))
 
         # Tokenizing the sentences
         tokenized_sentences = self.tokenizer(sentences['sentence'], padding=True, truncation=True, return_tensors='pt')
