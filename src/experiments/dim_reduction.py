@@ -30,13 +30,18 @@ class DimensionalityReductionExperiment(Experiment):
 		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
 		protected_templates_file = f'data/protected-p/{protected_property}/templates-01.csv'
 		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file)
-		protected_embedding = protected_embedding_dataset['embedding'].squeeze()	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
 
 		stereotyped_property = 'profession'
 		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
 		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
 		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file)
-		stereotyped_embedding = stereotyped_embedding_dataset['embedding'].squeeze()	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
+
+		# Preparing embeddings dataset
+		def squeeze_embedding_fn(sample):
+			sample['embedding'] = sample['embedding'].squeeze()
+			return sample
+		protected_embedding_dataset = protected_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=4)	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
+		stereotyped_embedding_dataset = stereotyped_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=4)
 
 		# Reducing the dimensionality of the embeddings
 		midstep: int = 50
@@ -45,9 +50,8 @@ class DimensionalityReductionExperiment(Experiment):
 		# 2. Reduction based on PCA
 		regressor: LinearRegressor = LinearRegressor()
 		regressor.train(protected_embedding_dataset)
-
 		reducer_1 = WeightsSelectorReducer.from_regressor(regressor, output_features=midstep)
-		reduced_protected_embeddings = reducer_1.reduce(protected_embedding)
+		reduced_protected_embeddings = reducer_1.reduce(protected_embedding_dataset['embedding'])
 
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
 
@@ -57,7 +61,7 @@ class DimensionalityReductionExperiment(Experiment):
 		])
 
 		# Reducing the embeddings
-		results = reducer.reduce(stereotyped_embedding)
+		results = reducer.reduce(stereotyped_embedding_dataset['embedding'])
 		print("Results: ", results)
 		print("Results shape: ", results.shape)
 		
