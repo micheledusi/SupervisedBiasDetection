@@ -8,7 +8,6 @@
 # EXPERIMENT: Dimensionality reduction over word embeddings obtained by BERT.
 # DATE: 2023-01-20
 
-import torch
 from datasets import Dataset
 from experiments.base import Experiment
 from model.reduction.weights import WeightsSelectorReducer
@@ -17,6 +16,8 @@ from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from utility.cache_embedding import get_cached_embeddings
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
+from view.plotter.scatter import ScatterPlotter, emb2plot
+
 
 class DimensionalityReductionExperiment(Experiment):
 
@@ -65,3 +66,7 @@ class DimensionalityReductionExperiment(Experiment):
 		print("Results: ", results)
 		print("Results shape: ", results.shape)
 		
+		# Showing the results
+		results_ds = Dataset.from_dict({'word': stereotyped_embedding_dataset['word'], 'embedding': results, 'value': stereotyped_embedding_dataset['value']})
+		plot_data = emb2plot(results_ds)
+		ScatterPlotter(plot_data).show()
