@@ -84,6 +84,28 @@ class WordEmbedder:
             self.average_tokens = kwargs['average_tokens']
         else:
             self.average_tokens = True
+        
+        # The maximum number of tokens to consider for each word
+        # If the value is "-1", all the tokens will be considered
+        # EXPECTED BEHAVIOUR: When a word is split into multiple tokens:
+        #   - if the number of tokens is less or equal than the maximum number of tokens, all the tokens will be considered (and eventually averaged, see "average_tokens")
+        #   - if the number of tokens is greater than the maximum number of tokens:
+        #       - if the value of "discard_longer_words" is True, the word will be discarded
+        #       - if the value of "discard_longer_words" is False, the considered tokens will be the first "max_tokens_number" tokens
+        if 'max_tokens_number' in kwargs:
+            arg = kwargs['max_tokens_number']
+            if arg == 'all':
+                self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
+            else:
+                self.max_tokens_number: int = max(1, arg)    # At least one token has to be considered
+        else:
+            self.max_tokens_number: int = -1
+        
+        # Whether to discard the words that are split into more tokens than the maximum number of tokens
+        if 'discard_longer_words' in kwargs:
+            self.discard_longer_words = kwargs['discard_longer_words']
+        else:
+            self.discard_longer_words = False
 
         # The model used to extract the embeddings
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
@@ -105,11 +127,13 @@ class WordEmbedder:
         # Both arrays have the same shape now
         # Shape = [#sentences_padded_tokens, #word_tokens]
         # Compare the two arrays:
-        first_occurrence_index = int(torch.where(torch.all(unfolded_array == repeated_subarray, dim=-1) == True)[0])
+        comparison = torch.all(unfolded_array == repeated_subarray, dim=-1)
+        # print("Comparison shape:", comparison.shape)
+        first_occurrence_index = int(torch.where(comparison == True)[0])
         # We get to a single scalar
         # Now we repeat the first occurrence index (increasing it) for each element of the subarray
         # Shape = [#word_tokens]
-        return torch.range(start=first_occurrence_index, end=first_occurrence_index + window_len - 1, dtype=torch.long)
+        return torch.arange(start=first_occurrence_index, end=first_occurrence_index + window_len, dtype=torch.long)
 
 
     def embed_word(self, word: dict[str, str], templates: Dataset) -> torch.Tensor:
@@ -126,7 +150,7 @@ class WordEmbedder:
 
         :param word: The word to be embedded, as a dictionary with the following keys: "word", "descriptor", and (optional) "value".
         :param kwargs: The keyword arguments to be passed to the embedding method.
-        :return: The embedding of the word.
+        :return: The embedding of the word (or None if the word is split into more tokens than the maximum number of tokens and the ``discard_longer_words`` parameter is True)
         """
         def replace_word_fn(sample):
             sentence, replacement = replace_word(sentence=sample['template'], word=word, pattern=self.pattern)
@@ -144,18 +168,29 @@ class WordEmbedder:
         else:
             sentences = sentences.shuffle().select(range(self.select_templates))
 
-        # Tokenizing the word and the sentences
+        # Tokenizing the word
         tokenized_word = self.tokenizer(word['word'], padding=False, truncation=False, return_tensors='pt', add_special_tokens=False)
         # Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
         # print(f"The word \"{word['word']}\" has been split in the following tokens:", tokenized_word['input_ids'][0])
+
+        # Tokenizing the sentences
         tokenized_sentences = self.tokenizer(sentences['sentence'], padding=True, truncation=True, return_tensors='pt')
 
-        # Finding tokens indices in the sentence
+        # Tokenized inputs
         sentences_tokens = tokenized_sentences['input_ids']  # The sentences tokens
-        word_tokens = tokenized_word['input_ids'][0] # The word tokens
-        num_tokens: int = word_tokens.shape[0]
+        word_tokens = tokenized_word['input_ids'][0] # The word tokens, a tensor of size [#word_tokens]
+        # num_tokens: int = word_tokens.shape[0]
         # print("Number of tokens for the word:", num_tokens, f"({word_tokens.data.tolist()})")
         # print("Sentences tokens size:", sentences_tokens.shape)
+        
+        # If the word is split into more tokens than the maximum number of tokens, we either discard it or truncate it
+        if self.max_tokens_number != -1 and len(word_tokens) > self.max_tokens_number:
+            if self.discard_longer_words:
+                return None
+            else:
+                word_tokens = word_tokens[:self.max_tokens_number]
+
+        # Getting the indices of the word tokens in the sentences tokens
         word_tokens_indices = torch.stack([self._get_subsequence_index(sent_tokens, word_tokens) for sent_tokens in sentences_tokens])
         # print("Word tokens indices:", word_tokens_indices)
 
@@ -203,12 +238,18 @@ class WordEmbedder:
         """
         def embed_word_fn(sample):
             embedding: torch.Tensor = self.embed_word(sample, templates)
-            sample['embedding'] = embedding
-            sample['num_tokens'] = embedding.shape[1]
+            sample['embedding'] = embedding     # This can be None, if the word is too long and self.discard_longer_words is True
+            sample['num_tokens'] = embedding.shape[1] if embedding is not None else 0
+            if embedding is None:
+                return None
             return sample
 
         # Embedding the words
         embeddings = words.map(embed_word_fn, batched=False)
+        if self.discard_longer_words:
+            embeddings = embeddings.filter(lambda sample: 
+                    sample['embedding'] is not None and
+                    sample['embedding'] is not [])
         embeddings = embeddings.with_format('torch')
         return embeddings
 
@@ -219,7 +260,7 @@ if __name__ == "__main__":
     words: Dataset = Dataset.from_csv('data/stereotyped-p/profession/words-01.csv').select(range(30, 40))
 
     # Creating the word embedder
-    word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False)
+    word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False, discard_longer_words=True, max_tokens_number=2)
 
     # Embedding a word
     embedding_dataset = word_embedder.embed(words, templates)
