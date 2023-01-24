@@ -30,6 +30,8 @@ class DimensionalityReductionExperiment(Experiment):
         param_select_templates = 'all'
         param_average_templates = True
         param_average_tokens = True
+        param_discard_longer_words = True
+        param_max_tokens_number = 1
         
         # Disk management for embedding datasets
         name = 'profession_words'
@@ -41,6 +43,8 @@ class DimensionalityReductionExperiment(Experiment):
             'select_templates': param_select_templates,
             'average_templates': param_average_templates,
             'average_tokens': param_average_tokens,
+            'discard_longer_words': param_discard_longer_words,
+            'max_tokens_number': param_max_tokens_number,
         }
 
         def create_embedding_fn():
