@@ -8,6 +8,7 @@
 # EXPERIMENT: Dimensionality reduction over word embeddings obtained by BERT.
 # DATE: 2023-01-20
 
+import os
 from datasets import Dataset
 from experiments.base import Experiment
 from model.reduction.weights import WeightsSelectorReducer
@@ -27,12 +28,12 @@ class DimensionalityReductionExperiment(Experiment):
 	def _execute(self, **kwargs) -> None:
 
 		# Embeddings dataset
-		protected_property = 'gender'
+		protected_property = 'religion'
 		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
 		protected_templates_file = f'data/protected-p/{protected_property}/templates-01.csv'
 		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file)
 
-		stereotyped_property = 'profession'
+		stereotyped_property = 'quality'
 		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
 		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
 		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file)
@@ -68,5 +69,9 @@ class DimensionalityReductionExperiment(Experiment):
 		
 		# Showing the results
 		results_ds = Dataset.from_dict({'word': stereotyped_embedding_dataset['word'], 'embedding': results, 'value': stereotyped_embedding_dataset['value']})
-		plot_data = emb2plot(results_ds)
-		ScatterPlotter(plot_data).show()
+		plot_data: Dataset = emb2plot(results_ds)
+		# If the directory does not exist, it will be created
+		if not os.path.exists(f'results/{protected_property}-{stereotyped_property}'):
+			os.makedirs(f'results/{protected_property}-{stereotyped_property}')
+		plot_data.to_csv(f'results/{protected_property}-{stereotyped_property}/reduced_scatter_data.csv', index=False)
+		# ScatterPlotter(plot_data).show()

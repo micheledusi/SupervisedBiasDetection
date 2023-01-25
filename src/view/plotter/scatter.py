@@ -68,5 +68,6 @@ class ScatterPlotter:
         plt.scatter(self._x, self._y, c=self._colors)
         for i, txt in enumerate(self._labels):
             plt.annotate(txt, (self._x[i], self._y[i]))
-        plt.title(self._title)
+        if self._title is not None:
+            plt.title(self._title)
         plt.show()
