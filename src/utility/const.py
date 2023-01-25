@@ -33,3 +33,6 @@ TOKEN_MASK: str = "[MASK]"
 
 # Bert model name
 DEFAULT_BERT_MODEL_NAME: str = "bert-base-uncased"
+
+# Configurations
+NUM_PROC: int = 1

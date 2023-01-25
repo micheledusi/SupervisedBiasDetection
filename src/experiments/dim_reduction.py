@@ -18,6 +18,7 @@ from model.reduction.pca import TrainedPCAReducer
 from utility.cache_embedding import get_cached_embeddings
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from view.plotter.scatter import ScatterPlotter, emb2plot
+from utility.const import NUM_PROC
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -42,8 +43,8 @@ class DimensionalityReductionExperiment(Experiment):
 		def squeeze_embedding_fn(sample):
 			sample['embedding'] = sample['embedding'].squeeze()
 			return sample
-		protected_embedding_dataset = protected_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=4)	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
-		stereotyped_embedding_dataset = stereotyped_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=4)
+		protected_embedding_dataset = protected_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
+		stereotyped_embedding_dataset = stereotyped_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)
 
 		# Reducing the dimensionality of the embeddings
 		midstep: int = 50

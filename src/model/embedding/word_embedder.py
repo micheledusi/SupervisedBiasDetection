@@ -20,7 +20,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, replace_word
-from utility.const import DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP
+from utility.const import DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP, NUM_PROC
 
 EMPTY_TEMPLATE = TOKEN_CLS + ' ' + SP_PATTERN + ' ' + TOKEN_SEP
 
@@ -250,7 +250,7 @@ class WordEmbedder:
             return sample
 
         # Tokenizing the words
-        words = words.map(tokenize_word_fn, batched=False, num_proc=4)
+        words = words.map(tokenize_word_fn, batched=False, num_proc=NUM_PROC)
         # Filtering the words that are too long
         if self.discard_longer_words and self.max_tokens_number != -1:
             print("Discarding words longer than", self.max_tokens_number, "tokens")
@@ -258,7 +258,7 @@ class WordEmbedder:
         print("Number of words to be embedded:", len(words))
 
         # Embedding the words
-        embeddings = words.map(embed_word_fn, batched=False, num_proc=4, remove_columns=['tokens', 'num_tokens'])
+        embeddings = words.map(embed_word_fn, batched=False, num_proc=NUM_PROC, remove_columns=['tokens', 'num_tokens'])
         # NOTE: the 'tokens' and 'num_tokens' columns are removed, since they are not needed anymore. If you want to keep them, you can edit the previous line.
         embeddings = embeddings.with_format('torch')
         return embeddings
