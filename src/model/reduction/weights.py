@@ -56,7 +56,7 @@ class WeightsSelectorReducer(SelectorReducer):
 		"""
 		assert len(weights.squeeze().size()) == 1, "The weights must be a 1D-vector."
 		# Sort the weights in descending order
-		indices = torch.argsort(weights.squeeze().abs(), descending=True, stable=False)
+		indices = torch.argsort(weights.squeeze().abs(), descending=True)
 		selected_indices = indices[:output_features]
 		# Call the superclass constructor by passing the indices of the selected features, that is the highest K features.
 		super().__init__(self._count_features(weights), selected_indices)
