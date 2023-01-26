@@ -20,7 +20,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, replace_word
-from utility.const import DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP, NUM_PROC
+from utility.const import DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP, NUM_PROC, DEVICE
 
 EMPTY_TEMPLATE = TOKEN_CLS + ' ' + SP_PATTERN + ' ' + TOKEN_SEP
 
@@ -263,8 +263,7 @@ class WordEmbedder:
         # Embedding the words
         embeddings = words.map(embed_word_fn, batched=False, num_proc=NUM_PROC, remove_columns=['tokens', 'num_tokens'])
         # NOTE: the 'tokens' and 'num_tokens' columns are removed, since they are not needed anymore. If you want to keep them, you can edit the previous line.
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        embeddings = embeddings.with_format('torch', device=device)
+        embeddings = embeddings.with_format('torch', device=DEVICE)
         return embeddings
 
 

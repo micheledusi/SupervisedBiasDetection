@@ -7,6 +7,8 @@
 
 # This module contains the constants used in the project.
 
+import torch
+
 # Filename and folder conventions
 # All paths are relative to the root of the project.
 FOLDER_DATA: str = "data"
@@ -36,3 +38,4 @@ DEFAULT_BERT_MODEL_NAME: str = "bert-base-uncased"
 
 # Configurations
 NUM_PROC: int = 1
+DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"

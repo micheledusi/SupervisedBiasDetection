@@ -11,6 +11,7 @@ from datasets import Dataset
 from data_processing.sentence_maker import get_dataset_from_words_csv
 from model.embedding.word_embedder import WordEmbedder
 from utility.cache import CachedData
+from utility.const import DEVICE
 
 DEFAULT_TEMPLATES_SELECTED_NUMBER = 'all'
 DEFAULT_AVERAGE_TEMPLATES = True
@@ -47,6 +48,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 		word_embedder = WordEmbedder(pattern=property_pattern, **params)
 		# Embedding words
 		embedding_dataset = word_embedder.embed(words, templates)
+		embedding_dataset = embedding_dataset.with_format('torch', device=DEVICE)
 		return embedding_dataset
 
 	# Creating info for the cache
