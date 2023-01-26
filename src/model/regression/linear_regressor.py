@@ -72,7 +72,8 @@ class LinearRegressor(AbstractRegressor):
 		values_set: list[str] = sorted(set(dataset['value']))   # In this way, the order of the values is computed according to the alphabetical order
 		features = Features({'label': ClassLabel(num_classes=len(values_set), names=values_set)})
 		labels_ds = Dataset.from_dict({"label": dataset['value']}, features=features) 
-		labels_ds = labels_ds.with_format("torch", device='cuda' if torch.cuda.is_available() else 'cpu')
+		device = 'cuda' if torch.cuda.is_available() else 'cpu'
+		labels_ds = labels_ds.with_format("torch", device=device)
 		labels = Variable(labels_ds['label'].unsqueeze(1).float())
 		# TODO: Convert labels to -1 and +1
 
@@ -92,8 +93,10 @@ class LinearRegressor(AbstractRegressor):
 			# print('Epoch {} => loss = {}'.format(epoch, loss.item()))
 	
 	def predict(self, dataset: Dataset) -> Dataset:
+		device = 'cuda' if torch.cuda.is_available() else 'cpu'
 		def predict_fn(sample):
-			inputs = Variable(sample['embedding'])
+			embedding = sample['embedding'].to(device)
+			inputs = Variable(embedding)
 			sample['prediction'] = self.model(inputs)
 			return sample
 		return dataset.map(predict_fn, batched=True)

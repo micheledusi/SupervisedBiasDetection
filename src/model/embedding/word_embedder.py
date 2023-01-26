@@ -213,6 +213,9 @@ class WordEmbedder:
         if self.average_tokens:
             word_embeddings = torch.mean(word_embeddings, dim=1).unsqueeze(1)
 
+        # Moving to CUDA if available
+        if torch.cuda.is_available():
+            word_embeddings = word_embeddings.cuda()
         return word_embeddings
 
     def embed(self, words: Dataset, templates: Dataset) -> Dataset:
@@ -260,7 +263,8 @@ class WordEmbedder:
         # Embedding the words
         embeddings = words.map(embed_word_fn, batched=False, num_proc=NUM_PROC, remove_columns=['tokens', 'num_tokens'])
         # NOTE: the 'tokens' and 'num_tokens' columns are removed, since they are not needed anymore. If you want to keep them, you can edit the previous line.
-        embeddings = embeddings.with_format('torch')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        embeddings = embeddings.with_format('torch', device=device)
         return embeddings
 
 
