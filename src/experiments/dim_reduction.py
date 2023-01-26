@@ -19,6 +19,7 @@ from utility.cache_embedding import get_cached_embeddings
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from view.plotter.scatter import ScatterPlotter, emb2plot
 from utility.const import NUM_PROC
+from utility.cache_embedding import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -74,5 +75,5 @@ class DimensionalityReductionExperiment(Experiment):
 		# If the directory does not exist, it will be created
 		if not os.path.exists(f'results/{protected_property}-{stereotyped_property}'):
 			os.makedirs(f'results/{protected_property}-{stereotyped_property}')
-		plot_data.to_csv(f'results/{protected_property}-{stereotyped_property}/reduced_scatter_data.csv', index=False)
+		plot_data.to_csv(f'results/{protected_property}-{stereotyped_property}/reduced_scatter_data_TM{DEFAULT_TEMPLATES_SELECTED_NUMBER}_TK{DEFAULT_MAX_TOKENS_NUMBER}_N{midstep}.csv', index=False)
 		# ScatterPlotter(plot_data).show()
