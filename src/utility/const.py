@@ -39,3 +39,10 @@ DEFAULT_BERT_MODEL_NAME: str = "bert-base-uncased"
 # Configurations
 NUM_PROC: int = 1
 DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Embedding configurations
+DEFAULT_TEMPLATES_SELECTED_NUMBER = 'all'
+DEFAULT_AVERAGE_TEMPLATES = True
+DEFAULT_AVERAGE_TOKENS = True
+DEFAULT_DISCARD_LONGER_WORDS = True
+DEFAULT_MAX_TOKENS_NUMBER = 1

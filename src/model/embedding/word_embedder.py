@@ -117,6 +117,15 @@ class WordEmbedder:
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
         self.model = AutoModel.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 
+    def get_tokens_number(self, word: str) -> int:
+        """
+        This method returns the number of tokens that the word will be split into.
+
+        :param word: The word to be split.
+        :return: The number of tokens that the word will be split into.
+        """
+        return len(self.tokenizer(word, padding=False, truncation=False, return_tensors='pt', add_special_tokens=False)['input_ids'][0])
+
     def _get_subsequence_index(self, array: torch.Tensor, subarray: torch.Tensor) -> torch.Tensor:
         # Example:
         # array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

@@ -22,8 +22,8 @@ directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from model.regression.abstract_regressor import AbstractRegressor
 from data_processing.sentence_maker import SP_PATTERN
-from utility.cache_embedding import get_cached_embeddings
 from utility.const import DEVICE
+from utility.cache import get_cached_embeddings
 
 
 class TorchLinearRegression(torch.nn.Module):
