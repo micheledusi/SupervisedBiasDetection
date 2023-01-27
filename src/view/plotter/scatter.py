@@ -16,7 +16,8 @@ def emb2plot(embeddings: Dataset) -> Dataset:
     Converts a dataset with reduced embeddings into a dataset with the right information to be plotted.
     It requires:
     - an 'embedding' column, to be split into 'x' and 'y'.
-    - an 
+    - a 'word' column, to be converted into 'label'
+    - a 'value' column, to be converted into 'color'
 
     :param embeddings: The dataset with embeddings information to be plotted.
     :return: A dataset that can be plotted by the ScatterPlotter class.
