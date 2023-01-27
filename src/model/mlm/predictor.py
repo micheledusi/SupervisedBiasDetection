@@ -34,9 +34,10 @@ class MLMPredictor:
 		if torch.cuda.is_available():
 			self.model.cuda()
 
-	def predict(self, sentences: str | list[str], target: str) -> float:
+	def predict(self, sentences: str | list[str], target: str) -> torch.Tensor:
 		"""
 		This method predicts the probability that the target word is inserted in the token MASK slot.
+		If multiple sentences are provided, the method will return a tensor with the probabilities for each sentence.
 
 		:param sentences: The sentence or the sentences list containing the masked word.
 		:param target: The target word to be masked.
@@ -72,19 +73,14 @@ class MLMPredictor:
 		# This gives us the probability for every token in the vocabulary, applying the softmax function on the last dimension
 		# The shape of the tensor is (batch_size, vocabulary_size)
 
-		vocabulary_scores = torch.mean(mask_token_scores, dim=0)
-		# The shape of the tensor is (vocabulary_size)
-
-		# Getting the index of the target word
+		# Getting and returning the scores for the target word (one for each sentence)
 		target_index = self.tokenizer.convert_tokens_to_ids(target)
-		return vocabulary_scores[target_index].item()
+		word_scores = mask_token_scores[:, target_index]
+		return word_scores
 
 	def compute_scores(self, protected_property: str, stereotyped_property: str, generation_file_id: int = 1) -> Dataset:
 		# Retrieve the datasets for MLM
 		pp_words, sp_words, templates = get_generation_datasets(protected_property, stereotyped_property, generation_file_id)
-
-		# Prepare the dataset for storing the scores
-		resulting_scores: Dataset = Dataset.from_dict({})
 
 		# Preparing an auxiliary embedder that can be used to discard long words (i.e. words that are tokenized in more than X tokens)
 		embedder = WordEmbedder()
@@ -92,26 +88,49 @@ class MLMPredictor:
 			print("Filtering the stereotyped words...")
 			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= const.DEFAULT_MAX_TOKENS_NUMBER)
 		
-		# For each stereotyped word
 		print("Computing the scores...")
-		for sw in tqdm(sp_words):
+		resulting_scores: dict[str, list] = {'stereotyped_word': [], 'stereotyped_value': []}
+		# Creating an empty scores list for each protected value
+		for pw in pp_words:
+			resulting_scores[pw['value']] = []
 
+		# For each stereotyped word
+		for sw in tqdm(sp_words):
 			# For each template, we insert the stereotyped word in the slot
 			sentences_pairs = [replace_stereotyped_word(sent, sw) for sent in templates['template']]
 			sentences = [sent_pair[0] for sent_pair in sentences_pairs if sent_pair[1] is True]
 
 			# Prepare the dictionary for storing the scores for each protected value
-			protected_scores: dict[str, float] = {"stereotyped_word": sw['word'], "stereotype_value": sw['value']}
+			resulting_scores["stereotyped_word"].append(sw['word'])
+			resulting_scores["stereotyped_value"].append(sw['value'])
 
+			# For each protected value, we store the scores
+			partial_scores: dict[str, torch.Tensor] = {}
 			for pw in pp_words:
-				# For each protected word, we mask it in the sentences
-				masked_sentences = [mask_protected_word(sent) for sent in sentences]
-				# Then, we predict the probability that the protected word is inserted in the MASK slot
-				protected_scores[pw['value']] = self.predict(masked_sentences, pw['word'])
+				# For each protected word, we try to replace it in the sentence
+				masked_sentences_pairs = [mask_protected_word(sent, pw) for sent in sentences]
+				masked_sentences = [sent_pair[0] for sent_pair in masked_sentences_pairs if sent_pair[1] is True]
 
-			resulting_scores = resulting_scores.add_item(protected_scores)
-		# Formatting with PyTorch
-		resulting_scores = resulting_scores.with_format("torch", device=const.DEVICE)
+				# Then, we predict the probability that the protected word is inserted in the MASK slot
+				# We obtain a score for each sentence
+				scores: torch.Tensor = self.predict(masked_sentences, pw['word'])
+
+				# Extending the scores list for the current protected value
+				protected_value = pw['value']
+				if protected_value not in partial_scores:
+					partial_scores[protected_value] = scores
+				else:
+					partial_scores[protected_value] = torch.cat((partial_scores[protected_value], scores))
+
+			# For each protected value
+			for protected_value in partial_scores:
+				# We compute the mean score for the current stereotyped value
+				mean_score = torch.mean(partial_scores[protected_value]).item()
+				# And we append it to the list of scores
+				resulting_scores[protected_value].append(mean_score)
+
+		# Re-formatting
+		resulting_scores: Dataset = Dataset.from_dict(resulting_scores).with_format("torch", device=const.DEVICE)
 
 		# Pairing the scores relative to two protected values, and computing the polarization
 		values_columns = resulting_scores.column_names[2:]

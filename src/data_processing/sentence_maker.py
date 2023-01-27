@@ -186,19 +186,28 @@ def replace_stereotyped_word(template: str, word: dict[str, str]) -> tuple[str, 
     return replace_word(template, word, SP_PATTERN)
 
 
-def mask_word(sentence: str, pattern: str) -> str:
+def mask_word(sentence: str, pattern: str, word: dict[str, str] = None) -> tuple[str, bool]:
     """
     This function will mask all the occurrences of the given pattern in the given sentence.
     If the sentence contain multiple occurrences of the pattern, each one will be masked.
 
+    If the word is not None, the method will also check if the word's descriptor matches the required descriptor (if any).
+    If the given word is None, the method will blindly mask all the occurrences of the pattern.
+
     :param sentence: The sentence in which the word will be masked.
     :param pattern: The pattern that will be used to find the word.
+    :param word: The word that constraints the masking, if the word's descriptor matches the required descriptor in the sentence.
     :return: The sentence with the word masked.
     """
-    return re.sub(pattern, const.TOKEN_MASK, sentence)
+    # Create a masked word
+    masked_word: dict[str, str] = word.copy() if word is not None else {}
+    masked_word['word'] = const.TOKEN_MASK
+
+    # Replace the pattern with the masked word, only if the word's descriptor matches the required descriptor (if any)
+    return replace_word(sentence, masked_word, pattern)
 
 
-def mask_protected_word(template: str) -> str:
+def mask_protected_word(template: str, word: dict[str, str] = None) -> tuple[str, bool]:
     """
     This function will mask all the occurrences of the protected word pattern in the given template.
     If the template contain multiple occurrences of the pattern, each one will be masked.
@@ -206,10 +215,10 @@ def mask_protected_word(template: str) -> str:
     :param template: The template in which the word will be masked.
     :return: The template with the word masked.
     """
-    return mask_word(template, PP_PATTERN)
+    return mask_word(template, PP_PATTERN, word)
 
 
-def mask_stereotyped_word(template: str) -> str:
+def mask_stereotyped_word(template: str, word: dict[str, str] = None) -> tuple[str, bool]:
     """
     This function will mask all the occurrences of the stereotyped word pattern in the given template.
     If the template contain multiple occurrences of the pattern, each one will be masked.
@@ -217,7 +226,7 @@ def mask_stereotyped_word(template: str) -> str:
     :param template: The template in which the word will be masked.
     :return: The template with the word masked.
     """
-    return mask_word(template, SP_PATTERN)
+    return mask_word(template, SP_PATTERN, word)
 
 
 class TemplateCombinator:
