@@ -10,6 +10,8 @@
 import torch
 from abc import ABC, abstractmethod
 
+VERBOSE = False
+
 
 class BaseDimensionalityReducer(ABC):
 	"""
@@ -75,7 +77,8 @@ class BaseDimensionalityReducer(ABC):
 		:param embeddings: The input tensor, of dimensions [ d1, d2, ..., dk, M ]
 		:return: The output tensor, of dimensions [ d1, d2, ..., dk, N ]
 		"""
-		print(f"Reducing features from size = {self.in_dim:3d} to size = {self.out_dim:3d} with: ", type(self))
+		if VERBOSE:
+			print(f"Reducing features from size = {self.in_dim:3d} to size = {self.out_dim:3d} with: ", type(self))
 		embeddings = self.__prepare_input(embeddings)
 		self.__check_input(embeddings)
 		results = self._reduction_transformation(embeddings)
