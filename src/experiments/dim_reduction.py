@@ -15,37 +15,35 @@ from model.reduction.weights import WeightsSelectorReducer
 from model.regression.linear_regressor import LinearRegressor
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
-from utility.cache_embedding import get_cached_embeddings
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from view.plotter.scatter import ScatterPlotter, emb2plot
-from utility.const import NUM_PROC
-from utility.cache_embedding import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
+from utility.const import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
 
 
 class DimensionalityReductionExperiment(Experiment):
+	"""
+	This experiment aims at reducing the dimensionality of the embeddings obtained by BERT.
+	The reduction is performed in two steps:
+	1. Reduction based on the weights of the classifier
+	2. Reduction based on PCA
+
+	The weights of the classifier are obtained by training a linear regressor on the embeddings of the protected property.
+	Then, the classifier is used to select the most relevant features of the embeddings.
+
+	The PCA is performed on the embeddings of the protected property. The learned PCA is then applied to the embeddings of the stereotyped property.
+
+	In this experiment, the embeddings are reduced to 2 dimensions.
+	"""
 
 	def __init__(self) -> None:
 		super().__init__("dimensionality reduction")
 
 	def _execute(self, **kwargs) -> None:
-
-		# Embeddings dataset
-		protected_property = 'religion'
-		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
-		protected_templates_file = f'data/protected-p/{protected_property}/templates-01.csv'
-		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file)
-
-		stereotyped_property = 'quality'
-		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
-		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
-		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file)
-
-		# Preparing embeddings dataset
-		def squeeze_embedding_fn(sample):
-			sample['embedding'] = sample['embedding'].squeeze()
-			return sample
-		protected_embedding_dataset = protected_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
-		stereotyped_embedding_dataset = stereotyped_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)
+		protected_property = 'gender'
+		stereotyped_property = 'profession'
+		
+		# Getting embeddings
+		protected_embedding_dataset, stereotyped_embedding_dataset = Experiment._get_default_embeddings(protected_property, stereotyped_property)
 
 		# Reducing the dimensionality of the embeddings
 		midstep: int = 50
