@@ -10,6 +10,8 @@
 # The embedding is a vector of floats, instanced as a PyTorch tensor.
 # This process can be done in different ways, depending on what the user wants to do.
 
+import random
+import re
 import torch
 from datasets import Dataset
 from transformers import AutoModel, AutoTokenizer
@@ -22,7 +24,7 @@ sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
 from utility.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP, NUM_PROC, DEVICE
 
-EMPTY_TEMPLATE = TOKEN_CLS + ' ' + SP_PATTERN + ' ' + TOKEN_SEP
+EMPTY_TEMPLATE = TOKEN_CLS + ' ' + SP_PATTERN.pattern + ' ' + TOKEN_SEP
 
 
 class WordEmbedder:
@@ -62,9 +64,9 @@ class WordEmbedder:
 		# Processing arguments
 		# The pattern used to find the word in the sentence.
 		if 'pattern' in kwargs:
-			self.pattern: str = kwargs['pattern']
+			self.pattern: re.Pattern[str] = re.compile(kwargs['pattern'])
 		else:
-			self.pattern: str = SP_PATTERN
+			self.pattern: re.Pattern[str] = SP_PATTERN
 
 		# The number of templates to select for each word.
 		# If the value is "-1", all the templates will be selected.
@@ -162,25 +164,21 @@ class WordEmbedder:
 
 		The resulting embeddings are a list of PyTorch tensors of size [#templates, #tokens, #features].
 		"""
+		templates_list = templates['template']
 
 		def compute_sentences_fn(word_sample):
 			""" Getting the sentences for a given word """
-			# Replacing the word in the templates, with a map function
-			def replace_word_fn(sample):
-				sentence, replacement = replace_word(sentence=sample['template'], word=word_sample, pattern=self.pattern)
-				sample['sentence'] = sentence
-				sample['replacement'] = replacement
-				return sample
-			sentences = templates.map(replace_word_fn, batched=False)
-			# Then selecting only the templates where the word was replaced
-			sentences = sentences.filter(lambda x: x['replacement'] == True)
-			# And finally, selecting a random subset of templates if needed
-			if self.templates_selected_number == -1 or self.templates_selected_number >= len(sentences):
-				sentences = sentences
-			else:
-				sentences = sentences.shuffle().select(range(self.templates_selected_number))
+			# Creating a list of sentences, where the word was replaced, and filtering out the ones that are not valid
+			sentences = map(lambda x: replace_word(sentence=x, word=word_sample, pattern=self.pattern), templates_list)
+			sentences = filter(lambda x: x[1] == True, sentences)
+			sentences = list(map(lambda x: x[0], sentences))
+			# Selecting a random subset of templates/sentences if needed
+			if self.templates_selected_number != -1 and self.templates_selected_number < len(sentences):
+				random.shuffle(sentences)
+				sentences = sentences[:self.templates_selected_number]
+
 			# "sentences" has now the sentences where the word was replaced
-			word_sample['sentences'] = sentences['sentence']
+			word_sample['sentences'] = sentences
 			word_sample['num_sentences'] = len(sentences)
 			return word_sample
 
@@ -286,7 +284,7 @@ if __name__ == "__main__":
 	words: Dataset = get_dataset_from_words_csv('data/stereotyped-p/profession/words-01.csv')
 
 	# Creating the word embedder
-	word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False, discard_longer_words=True, max_tokens_number=1)
+	word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False, discard_longer_words=True, max_tokens_number=2)
 
 	# Embedding a word
 	embedding_dataset = word_embedder.embed(words, templates)
