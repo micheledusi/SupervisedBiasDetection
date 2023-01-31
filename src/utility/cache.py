@@ -231,7 +231,7 @@ class CacheManager:
 
 
 class CachedData:
-	def __init__(self, name: str, group: str, metadata: dict[str, Any], creation_fn: Callable = None) -> None:
+	def __init__(self, name: str, group: str, metadata: dict[str, Any], creation_fn: Callable = None, rebuild: bool = False) -> None:
 		"""
 		This class is a context manager that can be used to cache data.
 		If the data does not exist in the cache, it is created using the given creation function.
@@ -241,16 +241,18 @@ class CachedData:
 		:param group: The name of the group.
 		:param metadata: The metadata of the object.
 		:param creation_fn: The function to call to create the object if it does not exist in the cache (optional; default: None)
+		:param rebuild: If True, the object is always created from scratch (optional; default: False)
 		"""
 		self._name: str = name
 		self._group: str = group
 		self._metadata: dict[str, Any] = metadata
 		self._creation_fn: Callable = creation_fn
+		self._rebuild: bool = rebuild
 		self._cacher: CacheManager = CacheManager()
 
 	
 	def __enter__(self):
-		if self._cacher.exists(self._name, self._group, self._metadata):
+		if not self._rebuild and self._cacher.exists(self._name, self._group, self._metadata):
 			print(f"Loading cached data \"{self._name}\"")
 			return self._cacher.load(self._name, self._group, self._metadata)
 		else:
@@ -267,7 +269,7 @@ class CachedData:
 		pass
 
 
-def get_cached_embeddings(property_name: str, property_pattern: str, words_file: str, templates_file: str, **kwargs) -> Dataset:
+def get_cached_embeddings(property_name: str, property_pattern: str, words_file: str, templates_file: str, rebuild: bool = False, **kwargs) -> Dataset:
 	"""
 	Creates and returns a dataset with the embeddings of the words in the given file.
 	The embeddings are cached, so that they are not computed again if the cache is not expired.
@@ -308,7 +310,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 		'input_templates_file': templates_file,
 	})
 
-	return CachedData(name, group, metadata, creation_fn=create_embedding_fn).__enter__()
+	return CachedData(name, group, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
 
 
 def get_cached_mlm_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:

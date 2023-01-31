@@ -22,9 +22,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
-from utility.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, TOKEN_CLS, TOKEN_SEP, NUM_PROC, DEVICE
-
-EMPTY_TEMPLATE = TOKEN_CLS + ' ' + SP_PATTERN.pattern + ' ' + TOKEN_SEP
+from utility.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, NUM_PROC, DEVICE
 
 
 class WordEmbedder:
@@ -176,6 +174,9 @@ class WordEmbedder:
 			if self.templates_selected_number != -1 and self.templates_selected_number < len(sentences):
 				random.shuffle(sentences)
 				sentences = sentences[:self.templates_selected_number]
+			
+			if len(sentences) == 0:
+				raise RuntimeWarning("Zero (0) sentences were found for the word " + word_sample['word'] + ". If this is not expected, please check the templates and the pattern.")
 
 			# "sentences" has now the sentences where the word was replaced
 			word_sample['sentences'] = sentences
@@ -194,7 +195,7 @@ class WordEmbedder:
 		assert len(all_sentences) == len(all_word_tokens), "The number of produced sentences for this batch must be the same of the number of tokens groups."
 
 		# Tokenizing the sentences
-		tokenized_all_sentences = self.tokenizer(all_sentences, padding=True, truncation=True, return_tensors='pt')['input_ids']
+		tokenized_all_sentences = self.tokenizer(all_sentences, padding=True, truncation=False, return_tensors='pt')['input_ids']
 		# "tokenized_all_sentences" is now a tensor of size [#all_sentences, #tokens]
 
 		# Getting the indices of the tokens of the words in the sentences
@@ -246,6 +247,12 @@ class WordEmbedder:
 		:param templates: The dataset of templates to be used to embed the words.
 		:return: The dataset of words with their embeddings.
 		"""
+		# Checks if the templates are provided as a parameter
+		if not templates:
+			raise ValueError("The templates must be provided as a parameter.")
+		if not words:
+			raise ValueError("The words must be provided as a parameter.")
+
 		def tokenize_words_batch_fn(batch: dict[list]) -> dict[list]:
 			tokens_ids = self.tokenizer(batch['word'], padding=False, truncation=False, add_special_tokens=False)
 			# Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)

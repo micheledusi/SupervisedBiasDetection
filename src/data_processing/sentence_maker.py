@@ -31,7 +31,10 @@ STEREOTYPED_PROPERTY: str = "quality"
 
 
 PP_PATTERN = r'(\[PROT\-WORD(?:\:([A-Za-z\-]+))?\])'
+PP_PATTERN: re.Pattern[str] = re.compile(PP_PATTERN)
+
 SP_PATTERN = r'(\[STER\-WORD(?:\:([A-Za-z\-]+))?\])'
+SP_PATTERN: re.Pattern[str] = re.compile(SP_PATTERN)
 # These pattern will extract two groups:
 #   - The first group will be the whole "protected word" mask, that is the part that's going to be replaced.
 #   - The second group will be the word descriptor, that is going to be used to select the word.
@@ -108,7 +111,7 @@ def get_generation_datasets(protected_property: str, stereotyped_property: str, 
         return pp_words, sp_words, templates
 
 
-def replace_word(sentence: str, word: dict[str, str], pattern: str) -> tuple[str, bool]:
+def replace_word(sentence: str, word: dict[str, str], pattern: re.Pattern[str]) -> tuple[str, bool]:
     """
     This function will replace all the occurrences of the given pattern in the given sentence with the given word.
     If the sentence contain multiple occurrences of the pattern, each one will be replaced with the given word
@@ -128,14 +131,14 @@ def replace_word(sentence: str, word: dict[str, str], pattern: str) -> tuple[str
     """
     assert 'word' in word, "The word must have a 'word' key."
     replaced: bool = False
-    found = re.findall(pattern, sentence)
+    found = pattern.findall(sentence)
     for matched in found:
         mask, required_descriptor = matched[0], matched[1]
-        if required_descriptor is None or required_descriptor == '':
+        if not required_descriptor:
             # No descriptor is required, so any word can be inserted
             sentence = sentence.replace(mask, word['word'])
             replaced = True
-        elif 'descriptor' in word and word['descriptor'] == required_descriptor:
+        elif word.get('descriptor', '') == required_descriptor:
             # OR the descriptor is required and it matches the word's descriptor (which exists)
             sentence = sentence.replace(mask, word['word'])
             replaced = True
