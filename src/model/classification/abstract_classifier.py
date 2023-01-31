@@ -5,10 +5,10 @@
 #   Date:    2023               #
 # - - - - - - - - - - - - - - - #
 
-# This module contains a class representing a regressor, that is, a model that can be trained and used to predict a variable value.
+# This module contains a class representing a classifier, that is, a model that can be trained and used to predict a variable value.
 # In our case, the model infers the value of a protected property from the embedding of a word (e.g. the vector in output to the NLP model).
 # 
-# An example of regression used in our project is the one that predicts the <gender> of a word from its embedding:
+# An example of classificaiton used in our project is the one that predicts the <gender> of a word from its embedding:
 # The <gender> is a protected property, for which we consider the values "male" and "female" among the possible values.
 # After training the model on a dataset of words, for which we know the <gender> value, we can use the model to predict
 # the <gender> value of new words, given their embedding.
@@ -19,13 +19,13 @@ from datasets import Dataset
 import torch
 
 
-class AbstractRegressor(ABC):
+class AbstractClassifier(ABC):
     """
-    This class represents a regressor performing a regression task.
+    This class represents a classifier performing a classification task.
     The regression involves an embedding of a word as the input (independent variable), and a protected property value as the output (dependent variable).
 
-    The class is abstract, and it is meant to be extended by concrete classes implementing the regression task
-    according to different approaches (e.g. linear regression, neural networks, etc.).
+    The class is abstract, and it is meant to be extended by concrete classes implementing the classification task
+    according to different approaches (e.g. linear classification, neural networks, etc.).
 
     This model is intended to be trained on a dataset of words, for which we know the value of the protected property.
     E.g. for the <gender> protected property, we should provide the embedding of words like "he" and "she", 
@@ -34,7 +34,6 @@ class AbstractRegressor(ABC):
 
     def __init__(self):
         pass
-
 
     @abstractmethod
     def train(self, dataset: Dataset) -> None:
@@ -49,7 +48,6 @@ class AbstractRegressor(ABC):
         """
         raise NotImplementedError("This method must be implemented by the subclasses.")
 
-
     @abstractmethod
     def predict(self, dataset: Dataset) -> Dataset:
         """
@@ -59,7 +57,6 @@ class AbstractRegressor(ABC):
         :return: A dataset with the same structure of the input dataset, but with an additional column named "prediction" containing the predicted value of the protected property.
         """
         raise NotImplementedError("This method must be implemented by the subclasses.")
-
 
     @abstractproperty
     def features_relevance() -> torch.Tensor:

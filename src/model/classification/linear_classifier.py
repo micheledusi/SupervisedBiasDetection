@@ -14,13 +14,13 @@
 
 import torch
 from torch.autograd import Variable
-from datasets import ClassLabel, Dataset, Features
+from datasets import Dataset
 import sys
 from pathlib import Path
 
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from model.regression.abstract_regressor import AbstractRegressor
+from model.classification.abstract_classifier import AbstractClassifier
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from utility.const import DEVICE
 from utility.cache import get_cached_embeddings
@@ -28,7 +28,13 @@ from utility.cache import get_cached_embeddings
 
 class TorchClassifier(torch.nn.Module):
 	"""
-	This class implements a linear regression model using the PyTorch Linear module.
+	This class implements a linear classification model in PyTorch.
+
+	The model is a linear layer, followed by a softmax function. 
+	Both the linear layer and the softmax function are implemented in PyTorch.
+
+	This class involves only the core model. For that, it is not meant to be used directly.
+	To properly use it, the LinearClassifier class is provided as a wrapper.
 	"""
 	def __init__(self, in_features: int, out_features: int) -> None:
 		super(TorchClassifier, self).__init__()
@@ -49,17 +55,22 @@ class TorchClassifier(torch.nn.Module):
 	@property
 	def weights(self) -> torch.Tensor:
 		"""
-		This method returns the weights of the linear regression model.
+		This method returns the weights of the linear layer, representing the weights of the linear classification model.
+		The weights are returned as a torch.Tensor object of shape [#out_features, #in_features].
 
-		:return: The weights of the linear regression model, as a torch.Tensor object.
+		:return: The weights of the linear classification model, as a torch.Tensor object.
 		"""
 		return self.linear.weight
 
 
-class LinearRegressor(AbstractRegressor):
+class LinearClassifier(AbstractClassifier):
 	"""
-	This class represents a regressor performing a regression task using a linear SVM.
-	The regression involves an embedding of a word as the input (independent variable), and a protected property value as the output (dependent variable).
+	This class represents a classifier for embeddings.
+	The classification core model is implemented in the TorchClassifier class, while this class is a wrapper for it.
+	This class also implements the training and the prediction of the model. Plus, it is a subclass of the AbstractClassifier interface.
+	This means that it can be used in other parts of the project, as a classifier for embeddings.
+
+	The classification involves an embedding of a word as the input (independent variable), and a protected property value as the output (dependent variable).
 	"""
 	learning_rate: float = 0.01
 	epochs: int = 1000
@@ -72,12 +83,13 @@ class LinearRegressor(AbstractRegressor):
 	@staticmethod
 	def define_class_labels(dataset: Dataset, column: str = 'value') -> LabelsDict:
 		"""
-		This method returns a dictionary where for each label corresponds a numerical vector.
+		This method returns a dictionary where for each label corresponds a numerical representation.
 		The values for the labels are taken from the given dataset, by default from the 'value' column.
-		If two values are equal, then the corresponding vectors are equal.
+		If two values are equal, then the corresponding "numerical representations" are equal.
 
-		With two distinct values, the method returns a dictionary with classes "+1" and "-1".
-		With more than two distinct values, the method returns a dictionary with classes "0", "1", "2", ..., "n-1".
+		The numerical representation is a one-hot vector, where the i-th element is 1 if the label is the i-th label in the list of labels, and 0 otherwise.
+		That is useful to perform the classification task, since the output of the model is a vector of probabilities (given by the softmax function),
+		and the label is the index of the maximum probability.
 
 		:param dataset: The dataset to analyze.
 		:param column: The column name of the dataset to use to extract the labels. Default: 'value'.
@@ -85,7 +97,7 @@ class LinearRegressor(AbstractRegressor):
 		"""
 		values_list = sorted(set(dataset[column]))
 		if len(values_list) == 1:
-			raise ValueError("The dataset contains only one value. We cannot perform a classification task.")
+			raise ValueError("The dataset contains only one class value. We cannot perform a classification task.")
 		base = torch.eye(len(values_list))
 		labels = {value: base[i] for i, value in enumerate(values_list)}
 		return labels
@@ -99,7 +111,7 @@ class LinearRegressor(AbstractRegressor):
 		embeddings = dataset['embedding']	# Embeddings are assumed to be a list of tensors with the same size: list( torch.Tensor[#features] )
 		self.input_size = embeddings[0].shape[0]
 		# We define the output size as the number of distinct values in the dataset
-		class_labels = LinearRegressor.define_class_labels(dataset)
+		class_labels = LinearClassifier.define_class_labels(dataset)
 		self.output_size = len(class_labels)
 		# Define the model
 		self.model = TorchClassifier(in_features=self.input_size, out_features=self.output_size)
@@ -140,15 +152,30 @@ class LinearRegressor(AbstractRegressor):
 
 	@property
 	def features_relevance(self) -> torch.Tensor:
-		return self.model.weights
+		"""
+		This method returns the relevance of each features in the linear classification model.
+
+		The original weights of the classifier are a torch.Tensor object of shape [#classes, #in_features], where #classes is the number of classes to predict.
+		Since we're interested in the relevance of the features, we compute the mean of the weights for each feature, 
+		and return the result as a torch.Tensor object of shape [#in_features].
+		(In our case, the number of features is 768).
+
+		:return: The relevance of each features in the linear classification model.
+		"""
+		linear_classifier_weights = self.model.weights
+		features_relevance = torch.mean(linear_classifier_weights, dim=0)
+		return features_relevance
 
 
 if __name__ == '__main__':
 
 	property = 'religion'
-	words_file = f'data/protected-p/{property}/words-02.csv'
-	templates_file = f'data/protected-p/{property}/templates-01.csv'
-	embedding_dataset = get_cached_embeddings(property, PP_PATTERN, words_file, templates_file, rebuild=True)
+	property_type = 'protected' # "stereotyped", "protected"
+
+	pattern = SP_PATTERN if property_type == 'stereotyped' else PP_PATTERN if property_type == 'protected' else None
+	words_file = f'data/{property_type}-p/{property}/words-02.csv'
+	templates_file = f'data/{property_type}-p/{property}/templates-01.csv'
+	embedding_dataset = get_cached_embeddings(property, pattern, words_file, templates_file, rebuild=True)
 
 	def print_dataset_info(dataset: Dataset):
 		# Printing the number of samples in the dataset
@@ -171,7 +198,7 @@ if __name__ == '__main__':
 	embedding_dataset = embedding_dataset.train_test_split(test_size=0.5, shuffle=True, seed=42)
 
 	# Using the embeddings to train the model
-	reg_model = LinearRegressor()
+	reg_model = LinearClassifier()
 	class_labels = reg_model.train(embedding_dataset['train'])
 	print_dataset_info(embedding_dataset['train'])
 
@@ -193,3 +220,7 @@ if __name__ == '__main__':
 			print(" WRONG")
 
 	print(f"Validation accuracy: {guesses}/{len(results)} ({guesses/len(results)*100:.2f}%)")
+
+	# Print the relevance of each feature
+	features_relevance = reg_model.features_relevance
+	print("Features relevance dimensions: ", features_relevance.shape)
