@@ -12,10 +12,9 @@ import os
 from datasets import Dataset
 from experiments.base import Experiment
 from model.reduction.weights import WeightsSelectorReducer
-from model.regression.linear_regressor import LinearRegressor
+from model.classification.linear_classifier import LinearClassifier
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
-from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from view.plotter.scatter import ScatterPlotter, emb2plot
 from utility.const import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
 
@@ -50,7 +49,7 @@ class DimensionalityReductionExperiment(Experiment):
 
 		# 1. Reduction based on the weights of the classifier
 		# 2. Reduction based on PCA
-		regressor: LinearRegressor = LinearRegressor()
+		regressor: LinearClassifier = LinearClassifier()
 		regressor.train(protected_embedding_dataset)
 		reducer_1 = WeightsSelectorReducer.from_regressor(regressor, output_features=midstep)
 		reduced_protected_embeddings = reducer_1.reduce(protected_embedding_dataset['embedding'])
