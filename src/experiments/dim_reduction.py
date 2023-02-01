@@ -11,9 +11,9 @@
 import os
 from datasets import Dataset
 from experiments.base import Experiment
-from model.classification.abstract_classifier import AbstractClassifier
+from model.classification.base import AbstractClassifier
 from model.reduction.weights import WeightsSelectorReducer
-from model.classification.linear_classifier import LinearClassifier
+from model.classification.linear import LinearClassifier
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from view.plotter.scatter import ScatterPlotter, emb2plot

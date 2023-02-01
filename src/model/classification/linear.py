@@ -5,11 +5,11 @@
 #   Date:	2023				#
 # - - - - - - - - - - - - - - - #
 
-# This module contains the classes that perform a linear regression.
-# The core model for the linear regression in PyTorch is implemented 
-# in the TorchLinearRegression class, using the PyTorch Linear module.
-# The LinearRegression class is then wrapped in the LinearRegressor class, 
-# which extends the _AbstractRegressor interface.
+# This module contains the classes that perform a linear classification.
+# The 'LinearClassifier' class extends the 'AbstractClassifier' class, 
+# thus it can be used as a classifier in other modules of the project.
+# The 'TorchClassifier' class implements the core model of the linear classifier,
+# with a linear layer and a softmax function.
 
 
 import torch
@@ -20,7 +20,7 @@ from pathlib import Path
 
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from model.classification.abstract_classifier import AbstractClassifier
+from model.classification.base import AbstractClassifier
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from utils.const import DEVICE
 from utils.cache import get_cached_embeddings
