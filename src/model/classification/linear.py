@@ -20,7 +20,7 @@ from pathlib import Path
 
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from model.classification.base import AbstractClassifier
+from model.classification.base import AbstractClassifier, ClassesDict
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from utils.const import DEVICE
 from utils.cache import get_cached_embeddings
@@ -63,6 +63,30 @@ class TorchClassifier(torch.nn.Module):
 		return self.linear.weight
 
 
+class OneHotClassesDict(ClassesDict):
+	"""
+	This class represents a dictionary where for each label corresponds a one-hot representation.
+	"""
+	def __init__(self, labels: list[str] | tuple[str]) -> None:
+		super().__init__()
+		if not labels or len(labels) <= 1:
+			raise ValueError("The list of labels must contain at least two elements.")
+		self._labels: tuple(str) = tuple(labels) if isinstance(labels, list) else labels
+		base = torch.eye(len(self._labels))
+		self._label2tensor = {label: base[i] for i, label in enumerate(self._labels)}
+	
+	@property
+	def labels(self) -> tuple[str]:
+		return tuple(self._labels)
+
+	def get_tensor(self, value: str) -> torch.Tensor:
+		return self._label2tensor[value]
+
+	def get_label(self, tensor: torch.Tensor) -> str:
+		index = torch.argmax(tensor)
+		return self._labels[index]
+
+
 class LinearClassifier(AbstractClassifier):
 	"""
 	This class represents a classifier for embeddings.
@@ -74,97 +98,70 @@ class LinearClassifier(AbstractClassifier):
 	"""
 	learning_rate: float = 0.01
 	epochs: int = 1000
-
-	LabelsDict = dict[str, torch.Tensor]
 	
 	def __init__(self) -> None:
 		super().__init__()
+		self.model = None
 
-	@staticmethod
-	def define_class_labels(dataset: Dataset, column: str = 'value') -> LabelsDict:
-		"""
-		This method returns a dictionary where for each label corresponds a numerical representation.
-		The values for the labels are taken from the given dataset, by default from the 'value' column.
-		If two values are equal, then the corresponding "numerical representations" are equal.
-
-		The numerical representation is a one-hot vector, where the i-th element is 1 if the label is the i-th label in the list of labels, and 0 otherwise.
-		That is useful to perform the classification task, since the output of the model is a vector of probabilities (given by the softmax function),
-		and the label is the index of the maximum probability.
-
-		:param dataset: The dataset to analyze.
-		:param column: The column name of the dataset to use to extract the labels. Default: 'value'.
-		:return: The list of labels of the dataset.
-		"""
-		values_list = sorted(set(dataset[column]))
-		if len(values_list) == 1:
-			raise ValueError("The dataset contains only one class value. We cannot perform a classification task.")
-		base = torch.eye(len(values_list))
-		labels = {value: base[i] for i, value in enumerate(values_list)}
-		return labels
+	@property
+	def features_relevance(self) -> torch.Tensor:
+		linear_classifier_weights = self.model.weights
+		features_relevance = torch.mean(linear_classifier_weights, dim=0)
+		return features_relevance
 	
-	@staticmethod
-	def _extract_labels(values: list[str], labels: LabelsDict) -> torch.Tensor:
-		return torch.Tensor([labels[value] for value in values])
-
-	def train(self, dataset: Dataset) -> LabelsDict:
+	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
 		# Define the model
-		embeddings = dataset['embedding']	# Embeddings are assumed to be a list of tensors with the same size: list( torch.Tensor[#features] )
-		self.input_size = embeddings[0].shape[0]
-		# We define the output size as the number of distinct values in the dataset
-		class_labels = LinearClassifier.define_class_labels(dataset)
-		self.output_size = len(class_labels)
-		# Define the model
-		self.model = TorchClassifier(in_features=self.input_size, out_features=self.output_size)
+		input_size: int = x.shape[1]
+		output_size: int = y.shape[1]
+		self.model = TorchClassifier(in_features=input_size, out_features=output_size)
 
 		# Define the loss function and the optimizer
 		criterion = torch.nn.MSELoss() 
 		optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate)
 
 		# Prepare the data for the training
-		# The inputs are the features considered in the regression
-		inputs = Variable(embeddings)
+		# The inputs are the features considered in the classification
+		x_var = Variable(x)
 		# The labels are the values we want to learn and predict
-		labels = Variable(torch.stack([class_labels[value] for value in dataset['value']]))
+		y_var = Variable(y)
 
 		for epoch in range(self.epochs):
 			# Clear gradient buffers, because we don't want any gradient from previous epoch to carry forward, dont want to cumulate gradients
 			optimizer.zero_grad()
 			# Compute the effective output of the model from the input
-			outputs = self.model(inputs)
+			outputs = self.model(x_var)
 			# Comparing the predicted output with the actual output, we compute the loss
-			loss = criterion(outputs, labels)
+			loss = criterion(outputs, y_var)
 			# Computing the gradients from the loss w.r.t. the parameters
 			loss.backward()
 			# Updating the parameters
 			optimizer.step()
 			if epoch % 100 == 0:
 				print('Epoch {} => loss = {}'.format(epoch, loss.item()))
-		return class_labels
-	
-	def predict(self, dataset: Dataset) -> Dataset:
-		device = 'cuda' if torch.cuda.is_available() else 'cpu'
-		def predict_fn(sample):
-			embedding = sample['embedding'].to(device)
-			inputs = Variable(embedding)
-			sample['prediction'] = self.model(inputs)
-			return sample
-		return dataset.map(predict_fn, batched=True)
 
-	@property
-	def features_relevance(self) -> torch.Tensor:
+	def _predict(self, x: torch.Tensor) -> torch.Tensor:
+		x_var = Variable(x)
+		outputs = self.model(x_var)
+		return outputs
+
+	def _compute_class_tensors(self, labels: list[str]) -> ClassesDict:
 		"""
-		This method returns the relevance of each features in the linear classification model.
+		This method returns a dictionary where for each label corresponds a one-hot representation.
+		The values for the labels are taken from the given list of labels.
+		If two values are equal, then the corresponding one-hot representations are equal.
 
-		The original weights of the classifier are a torch.Tensor object of shape [#classes, #in_features], where #classes is the number of classes to predict.
-		Since we're interested in the relevance of the features, we compute the mean of the weights for each feature, 
-		and return the result as a torch.Tensor object of shape [#in_features].
-		(In our case, the number of features is 768).
+		The one-hot representation is a torch.Tensor object of shape [#classes].
+		Each element of the tensor is 0, except for the element corresponding to the label of the input, which is 1.
 
-		:return: The relevance of each features in the linear classification model.
+		That is useful to perform a classification task, where the output of the model is a vector of probabilities (given by the softmax function)
+		and the label of the input is the index of the element with the highest probability.
+
+		:param labels: The list of labels to consider.
+		:return: The dictionary of one-hot representations.
 		"""
-		linear_classifier_weights = self.model.weights
-		features_relevance = torch.mean(linear_classifier_weights, dim=0)
-		return features_relevance
+		values_list: list[str] = sorted(set(labels))
+		classes_dict = OneHotClassesDict(values_list)
+		return classes_dict
 
 
 if __name__ == '__main__':
@@ -173,9 +170,11 @@ if __name__ == '__main__':
 	property_type = 'protected' # "stereotyped", "protected"
 
 	pattern = SP_PATTERN if property_type == 'stereotyped' else PP_PATTERN if property_type == 'protected' else None
-	words_file = f'data/{property_type}-p/{property}/words-02.csv'
-	templates_file = f'data/{property_type}-p/{property}/templates-01.csv'
-	embedding_dataset = get_cached_embeddings(property, pattern, words_file, templates_file, rebuild=True)
+	words_id = '02'
+	templates_id = '00' if property_type == 'protected' else '01' if property_type == 'stereotyped' else None
+	words_file = f'data/{property_type}-p/{property}/words-{words_id}.csv'
+	templates_file = f'data/{property_type}-p/{property}/templates-{templates_id}.csv'
+	embedding_dataset = get_cached_embeddings(property, pattern, words_file, templates_file, rebuild=False)
 
 	def print_dataset_info(dataset: Dataset):
 		# Printing the number of samples in the dataset
@@ -199,17 +198,17 @@ if __name__ == '__main__':
 
 	# Using the embeddings to train the model
 	reg_model = LinearClassifier()
-	class_labels = reg_model.train(embedding_dataset['train'])
+	reg_model.train(embedding_dataset['train'])
 	print_dataset_info(embedding_dataset['train'])
 
 	# Predict the values
-	results = reg_model.predict(embedding_dataset['test'])
+	results = reg_model.evaluate(embedding_dataset['test'])
 
 	# Print the results
 	guesses = 0
 	for result in results:
-		predicted_value = torch.argmax(result['prediction']).item()
-		actual_value = torch.argmax(class_labels[result['value']]).item()
+		predicted_value = reg_model.classes[result['prediction']]
+		actual_value = result['value']
 		print(f"Word: {result['word']:20s}", end=' ')
 		print(f"Predicted class:", predicted_value, end='\t')
 		print(f"Actual class:", actual_value, end='\t')
