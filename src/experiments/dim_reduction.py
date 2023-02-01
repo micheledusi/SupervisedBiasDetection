@@ -11,6 +11,7 @@
 import os
 from datasets import Dataset
 from experiments.base import Experiment
+from model.classification.abstract_classifier import AbstractClassifier
 from model.reduction.weights import WeightsSelectorReducer
 from model.classification.linear_classifier import LinearClassifier
 from model.reduction.composite import CompositeReducer
@@ -49,9 +50,9 @@ class DimensionalityReductionExperiment(Experiment):
 
 		# 1. Reduction based on the weights of the classifier
 		# 2. Reduction based on PCA
-		regressor: LinearClassifier = LinearClassifier()
-		regressor.train(protected_embedding_dataset)
-		reducer_1 = WeightsSelectorReducer.from_regressor(regressor, output_features=midstep)
+		classifier: AbstractClassifier = LinearClassifier()
+		classifier.train(protected_embedding_dataset)
+		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=midstep)
 		reduced_protected_embeddings = reducer_1.reduce(protected_embedding_dataset['embedding'])
 
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)

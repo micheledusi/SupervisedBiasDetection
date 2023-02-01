@@ -73,7 +73,7 @@ class WeightsSelectorReducer(SelectorReducer):
 		return cls(weights, output_features)
 	
 	@classmethod
-	def from_regressor(cls, regressor: AbstractClassifier, output_features: int) -> 'WeightsSelectorReducer':
+	def from_classifier(cls, regressor: AbstractClassifier, output_features: int) -> 'WeightsSelectorReducer':
 		"""
 		Factory method to create a new instance of the class.
 
