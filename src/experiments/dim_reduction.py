@@ -17,7 +17,7 @@ from model.classification.linear_classifier import LinearClassifier
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from view.plotter.scatter import ScatterPlotter, emb2plot
-from utility.const import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
+from utils.const import DEFAULT_TEMPLATES_SELECTED_NUMBER, DEFAULT_MAX_TOKENS_NUMBER
 
 
 class DimensionalityReductionExperiment(Experiment):

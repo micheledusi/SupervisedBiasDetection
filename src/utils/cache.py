@@ -5,7 +5,7 @@
 #   Date:	2023			   #
 # - - - - - - - - - - - - - - - #
 
-# This module offers some utility functions for caching data.
+# This module offers some utils functions for caching data.
 
 import copy
 import json
@@ -15,7 +15,7 @@ from typing import Any, Callable
 import pickle as pkl
 from datasets import Dataset
 from model.mlm.predictor import MLMPredictor
-from utility import const
+from utils.const import *
 from data_processing.sentence_maker import get_dataset_from_words_csv
 from model.embedding.word_embedder import WordEmbedder
 
@@ -41,7 +41,7 @@ def _hash_dict(obj: Any) -> int:
 
 class CacheManager:
 	"""
-	This class offers some utility functions for caching data.
+	This class offers some utils functions for caching data.
 	Each data can be saved along with a unique identifier and some metadata.
 	Then, the data can be retrieved by providing the unique identifier and the metadata.
 	"""
@@ -274,11 +274,11 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	"""
 	# Parameters
 	params = {
-		'templates_selected_number': kwargs.get('templates_selected_number', const.DEFAULT_TEMPLATES_SELECTED_NUMBER),
-		'average_templates': kwargs.get('average_templates', const.DEFAULT_AVERAGE_TEMPLATES),
-		'average_tokens': kwargs.get('average_tokens', const.DEFAULT_AVERAGE_TOKENS),
-		'discard_longer_words': kwargs.get('discard_longer_words', const.DEFAULT_DISCARD_LONGER_WORDS),
-		'max_tokens_number': kwargs.get('max_tokens_number', const.DEFAULT_MAX_TOKENS_NUMBER),
+		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
+		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
+		'average_tokens': kwargs.get('average_tokens', DEFAULT_AVERAGE_TOKENS),
+		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
+		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
 	}
 
 	def create_embedding_fn() -> Dataset:
@@ -289,7 +289,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 		word_embedder = WordEmbedder(pattern=property_pattern, **params)
 		# Embedding words
 		embedding_dataset = word_embedder.embed(words, templates)
-		embedding_dataset = embedding_dataset.with_format('torch', device=const.DEVICE)
+		embedding_dataset = embedding_dataset.with_format('torch', device=DEVICE)
 		return embedding_dataset
 
 	# Creating info for the cache
@@ -308,11 +308,11 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 def get_cached_mlm_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:
 	# Parameters
 	params = {
-		'templates_selected_number': kwargs.get('templates_selected_number', const.DEFAULT_TEMPLATES_SELECTED_NUMBER),
-		'average_templates': kwargs.get('average_templates', const.DEFAULT_AVERAGE_TEMPLATES),
-		'average_tokens': kwargs.get('average_tokens', const.DEFAULT_AVERAGE_TOKENS),
-		'discard_longer_words': kwargs.get('discard_longer_words', const.DEFAULT_DISCARD_LONGER_WORDS),
-		'max_tokens_number': kwargs.get('max_tokens_number', const.DEFAULT_MAX_TOKENS_NUMBER),
+		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
+		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
+		'average_tokens': kwargs.get('average_tokens', DEFAULT_AVERAGE_TOKENS),
+		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
+		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
 	}
 
 	def create_mlm_scores_fn() -> Dataset:

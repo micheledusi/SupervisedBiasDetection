@@ -15,7 +15,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent))
 
-from utility import const
+from utils.const import *
 from data_processing.sentence_maker import replace_stereotyped_word, mask_protected_word
 from data_processing.sentence_maker import get_generation_datasets
 from model.embedding.word_embedder import WordEmbedder
@@ -29,8 +29,8 @@ class MLMPredictor:
 	__softmax = torch.nn.Softmax(dim=-1)
 
 	def __init__(self) -> None:
-		self.tokenizer = AutoTokenizer.from_pretrained(const.DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModelForMaskedLM.from_pretrained(const.DEFAULT_BERT_MODEL_NAME)
+		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
+		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 		if torch.cuda.is_available():
 			self.model.cuda()
 
@@ -50,8 +50,8 @@ class MLMPredictor:
 
 		# Asserting that each sentence contains the MASK token
 		for sentence in sentences:
-			if const.TOKEN_MASK not in sentence:
-				raise Exception(f"The sentence '{sentence}' does not contain the mask token ({const.TOKEN_MASK}).")
+			if TOKEN_MASK not in sentence:
+				raise Exception(f"The sentence '{sentence}' does not contain the mask token ({TOKEN_MASK}).")
 			
 		inputs = self.tokenizer(sentences, padding=True, truncation=False, return_tensors="pt")
 		mask_token_index = torch.where(inputs["input_ids"] == self.tokenizer.mask_token_id)[1]	# Getting the index of the mask token for each sentence (=batch)
@@ -84,9 +84,9 @@ class MLMPredictor:
 
 		# Preparing an auxiliary embedder that can be used to discard long words (i.e. words that are tokenized in more than X tokens)
 		embedder = WordEmbedder()
-		if const.DEFAULT_DISCARD_LONGER_WORDS and isinstance(const.DEFAULT_MAX_TOKENS_NUMBER, int) and const.DEFAULT_MAX_TOKENS_NUMBER > 0:
+		if DEFAULT_DISCARD_LONGER_WORDS and isinstance(DEFAULT_MAX_TOKENS_NUMBER, int) and DEFAULT_MAX_TOKENS_NUMBER > 0:
 			print("Filtering the stereotyped words...")
-			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= const.DEFAULT_MAX_TOKENS_NUMBER)
+			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= DEFAULT_MAX_TOKENS_NUMBER)
 		
 		print("Computing the scores...")
 		resulting_scores: dict[str, list] = {'stereotyped_word': [], 'stereotyped_value': []}
@@ -130,7 +130,7 @@ class MLMPredictor:
 				resulting_scores[protected_value].append(mean_score)
 
 		# Re-formatting
-		resulting_scores: Dataset = Dataset.from_dict(resulting_scores).with_format("torch", device=const.DEVICE)
+		resulting_scores: Dataset = Dataset.from_dict(resulting_scores).with_format("torch", device=DEVICE)
 
 		# Pairing the scores relative to two protected values, and computing the polarization
 		values_columns = resulting_scores.column_names[2:]

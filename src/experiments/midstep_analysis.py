@@ -20,7 +20,7 @@ from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from model.classification.linear_classifier import LinearClassifier
 from view.plotter.scatter import ScatterPlotter, emb2plot
-from utility.const import *
+from utils.const import *
 
 """
 from datasets import disable_caching

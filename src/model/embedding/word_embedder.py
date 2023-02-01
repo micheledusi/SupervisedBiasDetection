@@ -22,7 +22,7 @@ from pathlib import Path
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
-from utility.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, NUM_PROC, DEVICE
+from utils.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, NUM_PROC, DEVICE
 
 
 class WordEmbedder:

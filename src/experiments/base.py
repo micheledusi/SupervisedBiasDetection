@@ -14,8 +14,8 @@ from datasets import Dataset
 
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from model.mlm.predictor import MLMPredictor
-from utility.cache import get_cached_embeddings, get_cached_mlm_scores
-from utility.const import NUM_PROC
+from utils.cache import get_cached_embeddings, get_cached_mlm_scores
+from utils.const import NUM_PROC
 
 
 class Experiment:

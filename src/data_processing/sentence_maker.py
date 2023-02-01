@@ -21,9 +21,9 @@ from datasets import DownloadMode, load_dataset, Dataset
 import re
 from itertools import product
 
-from utility import const
-from utility import file_system as fs
-from utility.article_inference import add_article
+from utils.const import TOKEN_MASK
+from utils import file_system as fs
+from utils.article_inference import add_article
 
 
 PROTECTED_PROPERTY: str = "religion"
@@ -204,7 +204,7 @@ def mask_word(sentence: str, pattern: str, word: dict[str, str] = None) -> tuple
     """
     # Create a masked word
     masked_word: dict[str, str] = word.copy() if word is not None else {}
-    masked_word['word'] = const.TOKEN_MASK
+    masked_word['word'] = TOKEN_MASK
 
     # Replace the pattern with the masked word, only if the word's descriptor matches the required descriptor (if any)
     return replace_word(sentence, masked_word, pattern)

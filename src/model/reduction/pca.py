@@ -11,7 +11,7 @@ import torch
 from sklearn.decomposition import PCA
 
 from model.reduction.base import BaseDimensionalityReducer
-from utility.const import DEVICE
+from utils.const import DEVICE
 
 
 class PCAReducer(BaseDimensionalityReducer):

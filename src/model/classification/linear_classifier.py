@@ -22,8 +22,8 @@ directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from model.classification.abstract_classifier import AbstractClassifier
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
-from utility.const import DEVICE
-from utility.cache import get_cached_embeddings
+from utils.const import DEVICE
+from utils.cache import get_cached_embeddings
 
 
 class TorchClassifier(torch.nn.Module):
