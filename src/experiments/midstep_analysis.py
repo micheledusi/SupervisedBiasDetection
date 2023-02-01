@@ -15,6 +15,7 @@ from datasets import Dataset
 from tqdm import tqdm
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
+from model.classification.svm import SVMClassifier
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
@@ -33,8 +34,8 @@ class MidstepAnalysisExperiment(Experiment):
 		super().__init__("midstep analysis")
 
 	def _execute(self, **kwargs) -> None:
-		protected_property = 'religion'
-		stereotyped_property = 'quality'
+		protected_property = 'gender'
+		stereotyped_property = 'profession'
 
 		# Getting embeddings (as Dataset objects)
 		protected_embedding_dataset, stereotyped_embedding_dataset = Experiment._get_default_embeddings(protected_property, stereotyped_property, rebuild=False)
@@ -61,7 +62,7 @@ class MidstepAnalysisExperiment(Experiment):
 		# TODO END
 
 		# Creating and training the classifier
-		self._classifier: AbstractClassifier = LinearClassifier()
+		self._classifier: AbstractClassifier = LinearClassifier() if DEFAULT_CLASSIFIER == 'linear' else SVMClassifier() if DEFAULT_CLASSIFIER == 'svm' else None
 		self._classifier.train(protected_embedding_dataset)
 
 		# For every value of n (called 'midstep'), run the experiment
@@ -93,7 +94,7 @@ class MidstepAnalysisExperiment(Experiment):
 		folder = f"results/{protected_property}-{stereotyped_property}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		filename = f"midstep_correlation_TM{DEFAULT_TEMPLATES_SELECTED_NUMBER}_TK{DEFAULT_MAX_TOKENS_NUMBER}.csv"
+		filename = f"midstep_correlation_TM{DEFAULT_TEMPLATES_SELECTED_NUMBER}_TK{DEFAULT_MAX_TOKENS_NUMBER}_CL{DEFAULT_CLASSIFIER}.csv"
 		scores.to_csv(f"{folder}/{filename}", index=False)
 
 	def _get_composite_reducer(self, prot_emb_ds: Dataset, midstep: int) -> CompositeReducer:
