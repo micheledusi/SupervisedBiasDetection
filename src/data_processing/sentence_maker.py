@@ -82,7 +82,7 @@ def get_dataset_from_words_json(words_json: dict) -> Dataset:
 def get_dataset_from_templates_json(templates_json: dict) -> Dataset:
     # Case 1: the type is "file"
     if templates_json['type'] == 'file':
-        return load_dataset('csv', data_files=templates_json['data'], download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
+        return Dataset.from_csv(templates_json['data'])
 
     # Case 2: the type is "array"
     elif templates_json['type'] == 'array':

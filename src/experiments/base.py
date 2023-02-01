@@ -47,13 +47,13 @@ class Experiment:
 		print(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
 	
 	@staticmethod
-	def _get_default_embeddings(protected_property: str, stereotyped_property: str) -> tuple[Dataset, Dataset]:
+	def _get_default_embeddings(protected_property: str, stereotyped_property: str, rebuild: bool = False) -> tuple[Dataset, Dataset]:
 		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
-		protected_templates_file = f'data/protected-p/{protected_property}/templates-01.csv'
-		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file)
+		protected_templates_file = f'data/protected-p/{protected_property}/templates-00.csv'
+		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file, rebuild=rebuild)
 		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
 		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
-		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file)
+		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file, rebuild=rebuild)
 
 		# Preparing embeddings dataset
 		def squeeze_embedding_fn(sample):

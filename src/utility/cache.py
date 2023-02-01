@@ -13,7 +13,7 @@ import os
 import time
 from typing import Any, Callable
 import pickle as pkl
-from datasets import DownloadMode, load_dataset, Dataset
+from datasets import Dataset
 from model.mlm.predictor import MLMPredictor
 from utility import const
 from data_processing.sentence_maker import get_dataset_from_words_csv
@@ -45,7 +45,6 @@ class CacheManager:
 	Each data can be saved along with a unique identifier and some metadata.
 	Then, the data can be retrieved by providing the unique identifier and the metadata.
 	"""
-
 	DEFAULT_ROOT_DIR: str = 'cache'
 	DEFAULT_GROUP: str = 'generic'
 
@@ -53,7 +52,6 @@ class CacheManager:
 
 	def __init__(self, root_dir: str = DEFAULT_ROOT_DIR) -> None:
 		self.root: str = root_dir
-
 
 	def _init_group(self, group: str) -> None:
 		"""
@@ -73,7 +71,6 @@ class CacheManager:
 			with open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'w') as f:
 				f.write('[]')
 
-
 	def _compute_filename(self, identifier: str, group: str, metadata: dict[str, Any]) -> str:
 		"""
 		This method computes the filename of the object with the given identifier, group and metadata.
@@ -83,7 +80,6 @@ class CacheManager:
 		descriptor['identifier'] = identifier
 		descriptor['group'] = group
 		return str(_hash_dict(descriptor))
-
 
 	def _register(self, identifier: str, filename: str, group: str, metadata: dict[str, Any]) -> None:
 		"""
@@ -105,23 +101,27 @@ class CacheManager:
 		"""
 		register = json.load(open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'r'))
 		assert type(register) == list
-		# If a corresponding object already exists, we remove it
-		for i in range(len(register)):
-			if register[i]['identifier'] == identifier and register[i]['metadata'] == metadata:
-				register.pop(i)
-				break
+
+		# If corresponding objects already exist, we remove them
+		def is_corresponding(entry):
+			return entry['identifier'] == identifier and entry['metadata'] == metadata
+		annotated_register = map(lambda entry: (entry, is_corresponding(entry)), register)
+		register = []
+		for entry, to_be_deleted in annotated_register:
+			if not to_be_deleted:
+				register.append(entry)
+			else:
+				os.remove(self.root + '/' + group + '/' + entry['filename'] + '.pkl')
 
 		# Adding the new object to the register
 		register.append({
 			'identifier': identifier,
 			'filename': filename,
 			'timestamp': time.time(),
-			'size': os.path.getsize(self.root + '/' + group + '/' + filename + '.pkl'),
 			'metadata': metadata
 		})
 		# Saving the register
 		json.dump(register, open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'w'))
-
 
 	def save(self, data: Any, identifier: str, group: str | None = None, metadata: dict[str, Any] | None = None) -> None:
 		"""
@@ -138,20 +138,15 @@ class CacheManager:
 		if group is None or group == '':
 			group = self.DEFAULT_GROUP
 		self._init_group(group)
-
 		# Asserting the metadata are a dictionary
 		if metadata is None:
 			metadata = dict()
-
 		# Computing the filename
 		filename = self._compute_filename(identifier, group, metadata)
-
-		# Saving the data
-		pkl.dump(data, open(self.root + '/' + group + '/' + filename + '.pkl', 'wb'))
-
 		# Registering the object to the group register
 		self._register(identifier, filename, group, metadata)
-
+		# Saving the data
+		pkl.dump(data, open(self.root + '/' + group + '/' + filename + '.pkl', 'wb'))
 
 	def exists(self, identifier: str, group: str | None = None, metadata: dict[str, Any] | None = None) -> bool:
 		"""
@@ -181,7 +176,6 @@ class CacheManager:
 			if obj['identifier'] == identifier and obj['metadata'] == metadata:
 				return True
 
-
 	def _retrieve_filename(self, identifier: str, group: str, metadata: dict[str, Any]) -> str | None:
 		"""
 		This method returns the filename of the object with the given identifier and metadata.
@@ -195,16 +189,13 @@ class CacheManager:
 		# Checking if the object exists
 		if not self.exists(identifier, group, metadata):
 			return None
-
 		# Searching
 		register = json.load(open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'r'))
 		for obj in register:
 			if obj['identifier'] == identifier and obj['metadata'] == metadata:
 				return obj['filename']
-
 		return None
 	
-
 	def load(self, identifier: str, group: str | None = None, metadata: dict[str, Any] | None = None) -> Any:
 		"""
 		This method loads the object with the given identifier and metadata.
@@ -250,20 +241,21 @@ class CachedData:
 		self._rebuild: bool = rebuild
 		self._cacher: CacheManager = CacheManager()
 
-	
 	def __enter__(self):
 		if not self._rebuild and self._cacher.exists(self._name, self._group, self._metadata):
-			print(f"Loading cached data \"{self._name}\"")
-			return self._cacher.load(self._name, self._group, self._metadata)
+			try:
+				print(f"Loading cached data \"{self._name}\"")
+				return self._cacher.load(self._name, self._group, self._metadata)
+			except FileNotFoundError as e:
+				print(f"File not found for cached data \"{self._name}\": {e}")
+		# Otherwise
+		if self._creation_fn is None:
+			raise NotImplemented("The creation function is not defined, and the object does not exist in the cache.")
 		else:
-			if self._creation_fn is None:
-				raise NotImplemented("The creation function is not defined, and the object does not exist in the cache.")
-			else:
-				print(f"Creating data \"{self._name}\" from scratch and saving to the cache")
-				data = self._creation_fn()
-				self._cacher.save(data, self._name, self._group, self._metadata)
-				return data
-
+			print(f"Creating data \"{self._name}\" from scratch and saving to the cache")
+			data = self._creation_fn()
+			self._cacher.save(data, self._name, self._group, self._metadata)
+			return data
 	
 	def __exit__(self, *args):
 		pass
@@ -291,7 +283,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 
 	def create_embedding_fn() -> Dataset:
 		# Loading the datasets
-		templates: Dataset = load_dataset('csv', data_files=templates_file, download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
+		templates: Dataset = Dataset.from_csv(templates_file)
 		words: Dataset = get_dataset_from_words_csv(words_file)
 		# Creating the word embedder
 		word_embedder = WordEmbedder(pattern=property_pattern, **params)
