@@ -7,8 +7,12 @@
 
 # This module contains the launcher of the project.
 
+import torch
+
 from experiments.dim_reduction import DimensionalityReductionExperiment
 from experiments.midstep_analysis import MidstepAnalysisExperiment
+
+torch.manual_seed(42)
 
 if __name__ == "__main__":
 	experiment = MidstepAnalysisExperiment()
