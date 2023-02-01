@@ -10,7 +10,7 @@
 import torch
 
 from model.reduction.base import BaseDimensionalityReducer
-from model.classification.abstract_classifier import AbstractClassifier
+from model.classification.base import AbstractClassifier
 
 
 class SelectorReducer(BaseDimensionalityReducer):
