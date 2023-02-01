@@ -84,7 +84,7 @@ class MLMPredictor:
 
 		# Preparing an auxiliary embedder that can be used to discard long words (i.e. words that are tokenized in more than X tokens)
 		embedder = WordEmbedder()
-		if const.DEFAULT_DISCARD_LONGER_WORDS:
+		if const.DEFAULT_DISCARD_LONGER_WORDS and isinstance(const.DEFAULT_MAX_TOKENS_NUMBER, int) and const.DEFAULT_MAX_TOKENS_NUMBER > 0:
 			print("Filtering the stereotyped words...")
 			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= const.DEFAULT_MAX_TOKENS_NUMBER)
 		
