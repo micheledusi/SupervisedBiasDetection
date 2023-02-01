@@ -22,7 +22,7 @@ class CompositeReducer(BaseDimensionalityReducer):
 
 	def __init__(self, reducers: list[BaseDimensionalityReducer]):
 		for i in range(1, len(reducers)):
-			assert reducers[i - 1].out_dim == reducers[i].in_dim
+			assert reducers[i - 1].out_dim == reducers[i].in_dim, "The reducers must be compatible in size. Instead, the output of the reducer at index {} is {}, and the input of the reducer at index {} is {}.".format(i - 1, reducers[i - 1].out_dim, i,  reducers[i].in_dim)
 		self._reducers: list[BaseDimensionalityReducer] = reducers
 		super().__init__(reducers[0].in_dim, reducers[-1].out_dim)
 
