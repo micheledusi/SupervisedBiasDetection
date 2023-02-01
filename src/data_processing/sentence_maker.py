@@ -17,7 +17,7 @@ sys.path.append(str(directory.parent.parent))
 
 # Imports
 import json
-from datasets import Dataset
+from datasets import DownloadMode, load_dataset, Dataset
 import re
 from itertools import product
 
@@ -41,7 +41,7 @@ SP_PATTERN: re.Pattern[str] = re.compile(SP_PATTERN)
 
 
 def get_dataset_from_words_csv(words_csv_file: str) -> Dataset:
-    dataset: Dataset = Dataset.from_csv(words_csv_file)
+    dataset: Dataset = load_dataset('csv', data_files=words_csv_file, download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
     if 'word' not in dataset.column_names:
         raise ValueError("The column 'word' is not present in the words dataset.")
     if 'value' not in dataset.column_names:
@@ -82,7 +82,7 @@ def get_dataset_from_words_json(words_json: dict) -> Dataset:
 def get_dataset_from_templates_json(templates_json: dict) -> Dataset:
     # Case 1: the type is "file"
     if templates_json['type'] == 'file':
-        return Dataset.from_csv(templates_json['data']) 
+        return load_dataset('csv', data_files=templates_json['data'], download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
 
     # Case 2: the type is "array"
     elif templates_json['type'] == 'array':

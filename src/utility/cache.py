@@ -13,7 +13,7 @@ import os
 import time
 from typing import Any, Callable
 import pickle as pkl
-from datasets import Dataset
+from datasets import DownloadMode, load_dataset, Dataset
 from model.mlm.predictor import MLMPredictor
 from utility import const
 from data_processing.sentence_maker import get_dataset_from_words_csv
@@ -291,7 +291,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 
 	def create_embedding_fn() -> Dataset:
 		# Loading the datasets
-		templates: Dataset = Dataset.from_csv(templates_file)
+		templates: Dataset = load_dataset('csv', data_files=templates_file, download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
 		words: Dataset = get_dataset_from_words_csv(words_file)
 		# Creating the word embedder
 		word_embedder = WordEmbedder(pattern=property_pattern, **params)
