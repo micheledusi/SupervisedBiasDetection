@@ -68,16 +68,11 @@ class OneHotClassesDict(ClassesDict):
 	This class represents a dictionary where for each label corresponds a one-hot representation.
 	"""
 	def __init__(self, labels: list[str] | tuple[str]) -> None:
-		super().__init__()
-		if not labels or len(labels) <= 1:
-			raise ValueError("The list of labels must contain at least two elements.")
-		self._labels: tuple(str) = tuple(labels) if isinstance(labels, list) else labels
-		base = torch.eye(len(self._labels))
-		self._label2tensor = {label: base[i] for i, label in enumerate(self._labels)}
-	
-	@property
-	def labels(self) -> tuple[str]:
-		return tuple(self._labels)
+		# Calling the superclass constructor with the labels
+		super().__init__(labels)
+		# Initializing the dictionary
+		base = torch.eye(len(self.labels))
+		self._label2tensor = {label: base[i] for i, label in enumerate(self.labels)}
 
 	def get_tensor(self, value: str) -> torch.Tensor:
 		return self._label2tensor[value]
@@ -144,7 +139,7 @@ class LinearClassifier(AbstractClassifier):
 		outputs = self.model(x_var)
 		return outputs
 
-	def _compute_class_tensors(self, labels: list[str]) -> ClassesDict:
+	def _compute_class_tensors(self, values: list[str]) -> ClassesDict:
 		"""
 		This method returns a dictionary where for each label corresponds a one-hot representation.
 		The values for the labels are taken from the given list of labels.
@@ -159,9 +154,8 @@ class LinearClassifier(AbstractClassifier):
 		:param labels: The list of labels to consider.
 		:return: The dictionary of one-hot representations.
 		"""
-		values_list: list[str] = sorted(set(labels))
-		classes_dict = OneHotClassesDict(values_list)
-		return classes_dict
+		labels: list[str] = sorted(set(values))
+		return OneHotClassesDict(labels)
 
 
 if __name__ == '__main__':

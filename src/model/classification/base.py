@@ -26,10 +26,17 @@ class ClassesDict():
 	However, while the mapping from the property value to the output tensor is exact, the mapping from the output tensor to the property value is approximate.
 	Each class has a unique output tensor, but a given output tensor may not have a perfect match in the dictionary, so the method returns the closest match.
 	"""
-	def __init__(self):
-		pass
+	def __init__(self, labels: list[str] | tuple[str]) -> None:
+		"""
+		This method initializes the labels.
+		As a precondition, the list of labels must contain at least two elements.
+		Furthermore, the labels must be unique.
+		"""
+		if not labels or len(labels) <= 1:
+			raise ValueError("The list of labels must contain at least two elements.")
+		self._labels: tuple[str] = tuple(labels) if isinstance(labels, list) else labels
 
-	@abstractproperty
+	@property
 	def labels(self) -> tuple[str]:
 		"""
 		This method returns the property values in the dictionary.
@@ -37,7 +44,7 @@ class ClassesDict():
 
 		:return: The tuple of property values in the dictionary.
 		"""
-		raise NotImplementedError("This method must be implemented by the subclasses.")
+		return self._labels
 
 	@abstractmethod
 	def get_tensor(self, value: str) -> torch.Tensor:
@@ -52,7 +59,7 @@ class ClassesDict():
 		raise NotImplementedError("This method must be implemented by the subclasses.")
 	
 	@abstractmethod
-	def get_label(self, output: torch.Tensor) -> str:
+	def get_label(self, tensor: torch.Tensor) -> str:
 		"""
 		This method returns the property value corresponding to the given output tensor.
 		This is an approximate method: a given output tensor may not have a perfect match in the dictionary, so the method returns the closest match.
@@ -151,9 +158,9 @@ class AbstractClassifier(ABC):
 		raise NotImplementedError("This method must be implemented by the subclasses.")
 		
 	@abstractmethod
-	def _compute_class_tensors(self, labels: list[str]) -> ClassesDict:
+	def _compute_class_tensors(self, values: list[str]) -> ClassesDict:
 		"""
-		This method computes the tensors corresponding to the labels for each class of the property.
+		This method computes the tensors corresponding to the values for each class of the property.
 		It is meant to be implemented by the subclasses, and it is called just before training the model.
 		After that, the tensors are stored in the _classes attribute, and they can be accessed by the `classes` property.
 		"""
