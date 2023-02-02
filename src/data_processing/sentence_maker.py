@@ -41,7 +41,7 @@ SP_PATTERN: re.Pattern[str] = re.compile(SP_PATTERN)
 
 
 def get_dataset_from_words_csv(words_csv_file: str) -> Dataset:
-    dataset: Dataset = load_dataset('csv', data_files=words_csv_file, download_mode=DownloadMode.FORCE_REDOWNLOAD)['train']
+    dataset: Dataset = Dataset.from_csv(words_csv_file)
     if 'word' not in dataset.column_names:
         raise ValueError("The column 'word' is not present in the words dataset.")
     if 'value' not in dataset.column_names:
