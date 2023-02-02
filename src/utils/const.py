@@ -43,11 +43,11 @@ torch.use_deterministic_algorithms(True)    # For reproducibility
 BATCH_SIZE = 32
 
 # Embedding configurations
-DEFAULT_TEMPLATES_SELECTED_NUMBER = 'all'
+DEFAULT_TEMPLATES_SELECTED_NUMBER = 3
 DEFAULT_AVERAGE_TEMPLATES = True
 DEFAULT_AVERAGE_TOKENS = True
 DEFAULT_DISCARD_LONGER_WORDS = True
-DEFAULT_MAX_TOKENS_NUMBER = 'all'
+DEFAULT_MAX_TOKENS_NUMBER = 1
 
 # Reduction configurations
-DEFAULT_CLASSIFIER = 'svm' # 'svm' or 'linear'
+DEFAULT_CLASSIFIER = 'linear' # 'svm' or 'linear'
