@@ -126,7 +126,7 @@ class MidstepAnalysisExperiment(Experiment):
 
 	def _compute_correlation(self, reduced_embeddings: torch.Tensor, mlm_scores: torch.Tensor) -> torch.Tensor:
 		"""
-		Computes the correlation (a similarity measure) between the original embeddings and the reduced embeddings.
+		Computes the correlation (a similarity measure) between the reduced embeddings and the MLM scores.
 		The result is a tensor where each element is the correlation between the MLM scores and a coordinate of the reduced embeddings.
 
 		:param reduced_embeddings: The reduced embeddings
