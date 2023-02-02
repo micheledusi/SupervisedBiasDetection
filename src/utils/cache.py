@@ -8,9 +8,9 @@
 # This module offers some utils functions for caching data.
 
 import copy
+from datetime import datetime
 import json
 import os
-import time
 from typing import Any, Callable
 import pickle as pkl
 import warnings
@@ -88,7 +88,6 @@ class CacheManager:
 		The registration writes in the group register file (a JSON file) the identifier and the metadata of the object.
 		Default metadata are added to the given metadata, such as:
 		- the save timestamp
-		- the size of the object
 		
 		This method does not save the object itself.
 		This method does not check if the object already exists.
@@ -101,7 +100,7 @@ class CacheManager:
 		:return: None.
 		"""
 		register = json.load(open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'r'))
-		assert type(register) == list
+		assert isinstance(register, list)
 
 		# If corresponding objects already exist, we remove them
 		def is_corresponding(entry):
@@ -112,17 +111,20 @@ class CacheManager:
 			if not to_be_deleted:
 				register.append(entry)
 			else:
+				print("Removing old object from cache: ", entry['filename'])
 				os.remove(self.root + '/' + group + '/' + entry['filename'] + '.pkl')
+		# "register" has now been cleaned from the corresponding objects (if any)
+		# Also, the corresponding files have been deleted from the cache.
 
 		# Adding the new object to the register
 		register.append({
 			'identifier': identifier,
 			'filename': filename,
-			'timestamp': time.time(),
+			'timestamp': str(datetime.today()),
 			'metadata': metadata
 		})
 		# Saving the register
-		json.dump(register, open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'w'))
+		json.dump(register, open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'w'), indent=4)
 
 	def save(self, data: Any, identifier: str, group: str | None = None, metadata: dict[str, Any] | None = None) -> None:
 		"""
@@ -136,11 +138,11 @@ class CacheManager:
 		:return: None.
 		"""
 		# Asserting that the group exists
-		if group is None or group == '':
+		if not group:
 			group = self.DEFAULT_GROUP
 		self._init_group(group)
 		# Asserting the metadata are a dictionary
-		if metadata is None:
+		if not metadata:
 			metadata = dict()
 		# Computing the filename
 		filename = self._compute_filename(identifier, group, metadata)
@@ -160,9 +162,9 @@ class CacheManager:
 		:param metadata: The metadata of the object, as a dictionary (optional; default: None)
 		:return: True if the object exists, False otherwise.
 		"""
-		if group is None or group == '':
+		if not group:
 			group = self.DEFAULT_GROUP
-		if metadata is None:
+		if not metadata:
 			metadata = dict()
 
 		# If the group does not exist, the object does not exist
@@ -173,6 +175,7 @@ class CacheManager:
 			return False
 		# If the object is not in the register, the object does not exist
 		register = json.load(open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'r'))
+		assert isinstance(register, list)
 		for obj in register:
 			if obj['identifier'] == identifier and obj['metadata'] == metadata:
 				return True
@@ -192,6 +195,7 @@ class CacheManager:
 			return None
 		# Searching
 		register = json.load(open(self.root + '/' + group + '/' + self.REGISTER_FILENAME, 'r'))
+		assert isinstance(register, list)
 		for obj in register:
 			if obj['identifier'] == identifier and obj['metadata'] == metadata:
 				return obj['filename']
@@ -208,15 +212,14 @@ class CacheManager:
 		:return: The object.
 		"""
 		# Checking if the object exists
-		if group is None or group == '':
+		if not group:
 			group = self.DEFAULT_GROUP
-		if metadata is None:
+		if not metadata:
 			metadata = dict()
-		if not self.exists(identifier, group, metadata):
-			raise Exception('Object does not exist.')
-
-		# Retrieving the filename
+		# The check on the specific object is done in the `_retrieve_filename` method
 		filename = self._retrieve_filename(identifier, group, metadata)
+		if not filename:
+			raise Exception("The object with identifier '" + identifier + "' and metadata '" + str(metadata) + "' does not exist in group '" + group + "'")
 
 		# Loading the object
 		return pkl.load(open(self.root + '/' + group + '/' + filename + '.pkl', 'rb'))
@@ -273,7 +276,9 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	:param templates_file: the path to the file containing the templates
 	:param kwargs: the parameters for the WordEmbedder
 	"""
-	# Parameters
+	# Parameters defined for embeddings
+	# A change in these parameters will invalidate the cached data, and require the embeddings to be recomputed
+	# For this, each cached data has a metadata dictionary containing these parameters
 	params = {
 		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
 		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
@@ -311,9 +316,8 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 def get_cached_mlm_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:
 	# Parameters
 	params = {
-		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
-		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
-		'average_tokens': kwargs.get('average_tokens', DEFAULT_AVERAGE_TOKENS),
+		# Only these two parameters are used in the MLM prediction. The others are used in the WordEmbedder.
+		# In order to avoid re-computing the embeddings when a unused parameter is changed, we do not include them in the metadata.
 		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
 		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
 	}
