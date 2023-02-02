@@ -62,33 +62,28 @@ class MidstepAnalysisExperiment(Experiment):
 		# TODO END
 
 		# Creating and training the classifier
-		self._classifier: AbstractClassifier = LinearClassifier() if DEFAULT_CLASSIFIER == 'linear' else SVMClassifier() if DEFAULT_CLASSIFIER == 'svm' else None
+		self._classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(DEFAULT_CLASSIFIER)
 		self._classifier.train(protected_embedding_dataset)
 
-		# For every value of n (called 'midstep'), run the experiment
-		scores: dict = {'midstep': [], 'correlation': []}
-		for midstep in tqdm(range(2, 768)):
+		# For every value of midstep (called 'n'), run the experiment
+		scores: dict = {'n': [], 'correlation': []}
+		for n in tqdm(range(2, 768)):
 
 			# First, we compute the 2D embeddings with the composite reducer, with the current value of midstep "n"
 			# Note: if an exception occurs, we stop the experiment
 			try:
-				reduced_embeddings = self._reduce_with_midstep(protected_embedding_dataset, stereotyped_embedding_dataset, midstep)
+				reduced_embeddings = self._reduce_with_midstep(protected_embedding_dataset, stereotyped_embedding_dataset, n)
 			except RuntimeError as e:
-				print(f"An exception occurred while reducing the embeddings with midstep {midstep}. Stopping the experiment.")
+				print(f"An exception occurred while reducing the embeddings with midstep {n}:\n{e}\nStopping the experiment.")
 				break
 
 			# Then, we compare the reduced embeddings with the mlm scores
 			correlation = self._compute_correlation(reduced_embeddings, mlm_scores[score_column])
-			scores['midstep'].append(midstep)
-			scores['correlation'].append(correlation)
+			scores['n'].append(n)
+			scores['x-correlation'].append(correlation[0])
+			scores['y-correlation'].append(correlation[1])
 		
 		scores: Dataset = Dataset.from_dict(scores)
-		
-		def prepare_fn(sample):
-			sample['x-correlation'] = abs(sample['correlation'][0])
-			sample['y-correlation'] = abs(sample['correlation'][1])
-			return sample
-		scores = scores.map(prepare_fn, batched=False, remove_columns=['correlation']).rename_column('midstep', 'n')
 
 		# Finally, we save the results
 		folder = f"results/{protected_property}-{stereotyped_property}"
@@ -96,6 +91,15 @@ class MidstepAnalysisExperiment(Experiment):
 			os.makedirs(folder)
 		filename = f"midstep_correlation_TM{DEFAULT_TEMPLATES_SELECTED_NUMBER}_TK{DEFAULT_MAX_TOKENS_NUMBER}_CL{DEFAULT_CLASSIFIER}.csv"
 		scores.to_csv(f"{folder}/{filename}", index=False)
+
+	@staticmethod
+	def _get_classifier(type: str = DEFAULT_CLASSIFIER) -> AbstractClassifier:
+		if type == 'linear':
+			return LinearClassifier()
+		elif type == 'svm':
+			return SVMClassifier()
+		else:
+			raise ValueError(f"Invalid requested type for classifier: {type}")
 
 	def _get_composite_reducer(self, prot_emb_ds: Dataset, midstep: int) -> CompositeReducer:
 		"""
@@ -130,9 +134,6 @@ class MidstepAnalysisExperiment(Experiment):
 		"""
 		assert reduced_embeddings.shape[0] == mlm_scores.shape[0], f"Expected the same number of embeddings and scores, but got {reduced_embeddings.shape[0]} and {mlm_scores.shape[0]}."
 		
-		# print("Reduced embeddings shape:", reduced_embeddings.shape)
-		# print("MLM scores shape:", mlm_scores.shape)
-
 		coefs = []
 		for polar_i in range(reduced_embeddings.shape[1]):
 			# emb_coord = reduced_embeddings[:, polar_i]
