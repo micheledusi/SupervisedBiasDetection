@@ -13,6 +13,7 @@ import os
 import time
 from typing import Any, Callable
 import pickle as pkl
+import warnings
 from datasets import Dataset
 from model.mlm.predictor import MLMPredictor
 from utils.const import *
@@ -282,6 +283,8 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	}
 
 	def create_embedding_fn() -> Dataset:
+		# Disabling annoying "FutureWarning" messages
+		warnings.simplefilter(action='ignore', category=FutureWarning)
 		# Loading the datasets
 		templates: Dataset = Dataset.from_csv(templates_file)
 		words: Dataset = get_dataset_from_words_csv(words_file)

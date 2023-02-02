@@ -14,7 +14,8 @@ import random
 import re
 import torch
 from datasets import Dataset
-from transformers import AutoModel, AutoTokenizer
+from datasets.fingerprint import Hasher
+from transformers import AutoModel, AutoTokenizer, logging
 
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
 from utils.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, NUM_PROC, DEVICE
 
+# Disabling transformers logging
+logging.set_verbosity_error()
 
 class WordEmbedder:
 	"""
@@ -183,6 +186,9 @@ class WordEmbedder:
 			word_sample['num_sentences'] = len(sentences)
 			return word_sample
 
+		# Hashing a function. This is needed for the internal caching of the PyArrow Dataset
+		Hasher.hash(compute_sentences_fn)
+
 		# Getting the sentences for each word
 		word_with_sentences = Dataset.from_dict(words).map(compute_sentences_fn, batched=False, num_proc=NUM_PROC)
 		# "word_with_sentences" has now the sentences where the word was replaced, as an item "sentences", and the number of sentences as an item "num_sentences"
@@ -278,6 +284,8 @@ class WordEmbedder:
 		words = words.map(tokenize_words_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)
 		# Current columns: ['word', 'value', 'descriptor'(optional), 'tokens', 'num_tokens']
 
+		# Hashing a function. This is needed for the internal caching of the PyArrow Dataset
+		Hasher.hash(embed_words_batch_fn)
 		# Embedding the words
 		embeddings_ds = words.map(embed_words_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC, remove_columns=['num_tokens'])
 		# NOTE: the 'num_tokens' column is removed, since it's not needed anymore. If you want to keep it, you can edit the previous line.
