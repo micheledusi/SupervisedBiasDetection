@@ -28,11 +28,27 @@ class MLMPredictor:
 
 	__softmax = torch.nn.Softmax(dim=-1)
 
-	def __init__(self) -> None:
+	def __init__(self, **kwargs) -> None:
 		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 		if torch.cuda.is_available():
 			self.model.cuda()
+		
+		# The maximum number of tokens to consider/retain for the word
+		if 'max_tokens_number' in kwargs:
+			arg = kwargs['max_tokens_number']
+			if arg == 'all':
+				self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
+			else:
+				self.max_tokens_number: int = max(1, arg)	# At least one token has to be considered
+		else:
+			self.max_tokens_number: int = -1
+		
+		# Whether to discard the words that are split into more tokens than the maximum number of tokens
+		if 'discard_longer_words' in kwargs:
+			self.discard_longer_words = kwargs['discard_longer_words']
+		else:
+			self.discard_longer_words = False
 
 	def predict(self, sentences: str | list[str], target: str) -> torch.Tensor:
 		"""
@@ -84,9 +100,9 @@ class MLMPredictor:
 
 		# Preparing an auxiliary embedder that can be used to discard long words (i.e. words that are tokenized in more than X tokens)
 		embedder = WordEmbedder()
-		if DEFAULT_DISCARD_LONGER_WORDS and isinstance(DEFAULT_MAX_TOKENS_NUMBER, int) and DEFAULT_MAX_TOKENS_NUMBER > 0:
+		if self.discard_longer_words and isinstance(self.max_tokens_number, int) and self.max_tokens_number > 0:
 			print("Filtering the stereotyped words...")
-			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= DEFAULT_MAX_TOKENS_NUMBER)
+			sp_words = sp_words.filter(lambda x: embedder.get_tokens_number(x['word']) <= self.max_tokens_number)
 		
 		print("Computing the scores...")
 		resulting_scores: dict[str, list] = {'stereotyped_word': [], 'stereotyped_value': []}

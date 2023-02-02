@@ -323,7 +323,7 @@ def get_cached_mlm_scores(protected_property: str, stereotyped_property: str, ge
 	}
 
 	def create_mlm_scores_fn() -> Dataset:
-		return MLMPredictor().compute_scores(protected_property, stereotyped_property, generation_id)
+		return MLMPredictor(**params).compute_scores(protected_property, stereotyped_property, generation_id)
 		
 	# Creating info for the cache
 	name: str = f"{protected_property}_{stereotyped_property}_mlm_scores"
