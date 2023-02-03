@@ -96,7 +96,7 @@ class LinearClassifier(AbstractClassifier):
 
 	@property
 	def features_relevance(self) -> torch.Tensor:
-		linear_classifier_weights = self.model.weights
+		linear_classifier_weights = self.model.weights.abs()
 		features_relevance = torch.mean(linear_classifier_weights, dim=0)
 		return features_relevance
 	

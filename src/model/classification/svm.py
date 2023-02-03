@@ -51,7 +51,7 @@ class SVMClassifier(AbstractClassifier):
 
 	@property
 	def features_relevance(self) -> torch.Tensor:
-		return torch.Tensor(self._model.coef_).squeeze()
+		return torch.Tensor(self._model.coef_).squeeze().abs()
 
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
 		self._model.fit(x, y)
