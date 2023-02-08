@@ -13,8 +13,7 @@ import sys
 from pathlib import Path
 
 directory = Path(__file__)
-sys.path.append(str(directory.parent.parent))
-
+sys.path.append(str(directory.parent.parent.parent))
 from utils.const import *
 from data_processing.sentence_maker import replace_stereotyped_word, mask_protected_word
 from data_processing.sentence_maker import get_generation_datasets
@@ -42,13 +41,13 @@ class MLMPredictor:
 			else:
 				self.max_tokens_number: int = max(1, arg)	# At least one token has to be considered
 		else:
-			self.max_tokens_number: int = -1
+			self.max_tokens_number: int = DEFAULT_MAX_TOKENS_NUMBER
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
 		if 'discard_longer_words' in kwargs:
 			self.discard_longer_words = kwargs['discard_longer_words']
 		else:
-			self.discard_longer_words = False
+			self.discard_longer_words = DEFAULT_DISCARD_LONGER_WORDS
 
 	def predict(self, sentences: str | list[str], target: str) -> torch.Tensor:
 		"""
@@ -168,7 +167,7 @@ if __name__ == "__main__":
 	resulting_scores = MLMPredictor().compute_scores(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY)
 
 	# Saving the resulting scores
-	output_file = 'mlm_scores.csv'
+	output_file = f'mlm_scores_TK{DEFAULT_MAX_TOKENS_NUMBER}.csv'
 	output_dir = Path(f"results/{PROTECTED_PROPERTY}-{STEREOTYPED_PROPERTY}")
 
 	output_dir.mkdir(parents=True, exist_ok=True)
