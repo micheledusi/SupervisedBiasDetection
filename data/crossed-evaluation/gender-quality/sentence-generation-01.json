@@ -1,0 +1,23 @@
+{
+    "protected-words": {
+        "type": "array",
+        "data": [
+            {"word":"he", "value":"male", "descriptor":"subj"},
+            {"word":"she", "value":"female", "descriptor":"subj"},
+            {"word":"him", "value":"male", "descriptor":"obj"},
+            {"word":"her", "value":"female", "descriptor":"obj"},
+            {"word":"his", "value":"male", "descriptor":"poss"},
+            {"word":"her", "value":"female", "descriptor":"poss"},
+            {"word":"father", "value":"male", "descriptor":"parent"},
+            {"word":"mother", "value":"female", "descriptor":"parent"}
+        ]
+    },
+    "stereotyped-words": {
+        "type": "file",
+        "data": "data/stereotyped-p/quality/words-01.csv"
+    },
+    "templates": {
+        "type": "file",
+        "data": "data/crossed-evaluation/gender-quality/templates-01.csv"
+    }
+}

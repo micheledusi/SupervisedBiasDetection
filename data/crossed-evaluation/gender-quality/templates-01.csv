@@ -1,0 +1,11 @@
+template,association
+"[PROT-WORD:subj] is really [STER-WORD].",positive
+"I think [PROT-WORD:subj] was quite [STER-WORD].",positive
+"My impression is that [PROT-WORD:subj] is [STER-WORD].",positive
+"My [PROT-WORD:parent] has always been so [STER-WORD].",positive
+"How can my [PROT-WORD:parent] be so [STER-WORD]?",positive
+"[PROT-WORD:poss] attitude is very [STER-WORD].",positive
+"Being so [STER-WORD] it's part of [PROT-WORD:poss] character.",positive
+"Never have I seen [PROT-WORD:obj] so [STER-WORD].",positive
+"[PROT-WORD:subj] is often [STER-WORD].",positive
+"I'll always remember [PROT-WORD:obj] as a [STER-WORD] person.",positive
