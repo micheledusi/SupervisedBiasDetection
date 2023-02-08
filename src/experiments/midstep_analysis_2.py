@@ -66,10 +66,10 @@ class MidstepAnalysis2Experiment(Experiment):
 		"""
 		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', 1, 0, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates)
+			templates_selected_number=num_templates).sort('word')
 		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', 1, 1, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates)
+			templates_selected_number=num_templates).sort('word')
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
 	def _get_mlm_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int) -> Dataset:
@@ -124,11 +124,11 @@ class MidstepAnalysis2Experiment(Experiment):
 
 	def _execute(self, **kwargs) -> None:
 		protected_property = 'gender'
-		stereotyped_property = 'profession'
+		stereotyped_property = 'quality'
 
-		num_max_tokens = [1, 2]
-		num_templates = [3]
-		classifier_type = 'svm'
+		num_max_tokens = [1, 2, 3, 4, 'all']
+		num_templates = [3, 6, 'all']		# For these properties, the total number of templates is 13 (quality) or 11 (profession)
+		classifier_type = 'svm'			# 'linear' or 'svm'
 
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768))})
 
@@ -175,7 +175,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			correlations = correlations.moveaxis(0, 1)
 			for dim in range(correlations.shape[0]):
 				# Add the correlation values to the results dataset
-				results.add_column(f"TK{ntok}_TM{ntem}_DIM{dim}", correlations[dim].tolist())
+				results = results.add_column(f"TK{ntok}_TM{ntem}_DIM{dim}", correlations[dim].tolist())
 
 		# Save the results
 		folder = f"results/{protected_property}-{stereotyped_property}"
