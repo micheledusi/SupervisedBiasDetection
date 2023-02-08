@@ -25,11 +25,11 @@ from utils.cache import get_cached_embeddings
 
 if __name__ == '__main__':
 
-	property = 'gender'
+	property = 'religion'
 	property_type = 'protected' # "stereotyped", "protected"
 
 	pattern = SP_PATTERN if property_type == 'stereotyped' else PP_PATTERN if property_type == 'protected' else None
-	words_id = '01'
+	words_id = '02'
 	templates_id = '00' if property_type == 'protected' else '01' if property_type == 'stereotyped' else None
 	words_file = f'data/{property_type}-p/{property}/words-{words_id}.csv'
 	templates_file = f'data/{property_type}-p/{property}/templates-{templates_id}.csv'
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 	embedding_dataset = embedding_dataset.map(squeeze_fn, batched=True)
 
 	# Splitting the dataset into train and test
-	embedding_dataset = embedding_dataset.train_test_split(test_size=0.8, shuffle=True, seed=42)
+	embedding_dataset = embedding_dataset.train_test_split(test_size=0.5, shuffle=True, seed=42)
 
 	# Using the embeddings to train the model
 	reg_model = SVMClassifier()
