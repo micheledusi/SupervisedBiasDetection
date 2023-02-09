@@ -1,8 +1,8 @@
 # - - - - - - - - - - - - - - - #
-#   Supervised Bias Detection   #
-#                               #
-#   Author:  Michele Dusi       #
-#   Date:    2023               #
+#	Supervised Bias Detection	#
+#								#
+#	Author:  Michele Dusi		#
+#	Date:	2023				#
 # - - - - - - - - - - - - - - - #
 
 from datasets import Dataset
