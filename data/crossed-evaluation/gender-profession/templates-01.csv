@@ -18,4 +18,4 @@ template,association
 "I called the [STER-WORD] asking for help, but [PROT-WORD:subj] didn't answer.",positive
 "The [STER-WORD] did a great job, so I thanked [PROT-WORD:obj].",positive
 "[PROT-WORD:subj]'s the best [STER-WORD] among them.",positive
-"The [STER-WORD] asked [PROT-WORD:obj]self what was happening.",positive
+"The [STER-WORD] asked [PROT-WORD:obj-rifl] what was happening.",positive

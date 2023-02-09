@@ -5,7 +5,9 @@
             {"word":"he", "value":"male", "descriptor":"subj"},
             {"word":"she", "value":"female", "descriptor":"subj"},
             {"word":"him", "value":"male", "descriptor":"obj"},
-            {"word":"her", "value":"female", "descriptor":"obj"}
+            {"word":"her", "value":"female", "descriptor":"obj"},
+            {"word":"himself", "value":"male", "descriptor":"obj-rifl"},
+            {"word":"herself", "value":"female", "descriptor":"obj-rifl"}
         ]
     },
     "stereotyped-words": {
