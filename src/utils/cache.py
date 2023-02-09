@@ -15,7 +15,7 @@ from typing import Any, Callable
 import pickle as pkl
 import warnings
 from datasets import Dataset
-from model.mlm.predictor import MLMPredictor
+from model.cross_scoring.mlm_predictor import MLMPredictor
 from utils.const import *
 from data_processing.sentence_maker import get_dataset_from_words_csv
 from model.embedding.word_embedder import WordEmbedder
