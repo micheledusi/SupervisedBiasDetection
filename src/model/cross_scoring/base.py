@@ -73,6 +73,9 @@ class CrossScorer:
 		if self.discard_longer_words and isinstance(self.max_tokens_number, int) and self.max_tokens_number > 0:
 			print("Filtering the stereotyped words...")
 			stereotyped_words = stereotyped_words.filter(lambda x: self.embedder.get_tokens_number(x['word']) <= self.max_tokens_number)
+			# If there are no more rows, we raise an error
+			if len(stereotyped_words) == 0:
+				raise ValueError("The stereotyped words dataset is empty after filtering the words with more tokens than the maximum number of tokens.")
 
 		print("Preparing word tokens...")
 		max_lenght = self.max_tokens_number if isinstance(self.max_tokens_number, int) and self.max_tokens_number > 0 else None
