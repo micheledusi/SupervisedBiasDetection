@@ -51,3 +51,7 @@ DEFAULT_MAX_TOKENS_NUMBER = 'all'
 
 # Reduction configurations
 DEFAULT_CLASSIFIER = 'linear' # 'svm' or 'linear'
+
+# Crossed evaluation configurations
+DEFAULT_CROSS_SCORE = 'pppl'					# 'pppl' or 'mlm'
+DEFAULT_POLARIZATION_STRATEGY = 'difference'	# 'difference' or 'ratio'

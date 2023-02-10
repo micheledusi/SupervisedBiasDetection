@@ -25,7 +25,14 @@ from model.classification.base import AbstractClassifier
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.cache import get_cached_embeddings, get_cached_mlm_scores
+from utils.cache import get_cached_embeddings, get_cached_cross_scores
+
+
+NUM_MAX_TOKENS = [1, 2]					# [1, 2, 3, 4, 'all']
+NUM_TEMPLATES = [3]							# [3, 6, 'all']
+CLASSIFIER_TYPE = 'svm'						# 'svm' or 'linear'
+CROSS_SCORE = 'pppl'						# 'pppl' or 'mlm'
+POLARIZATION = 'difference'					# 'difference' or 'ratio'
 
 
 class MidstepAnalysis2Experiment(Experiment):
@@ -54,7 +61,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('pytorch')
 		return embeddings
 
-	def _get_embeddings(self, protected_property: str, stereotyped_property: str, num_max_tokens: int, num_templates: int) -> tuple[Dataset, Dataset]:
+	def _get_embeddings(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, num_templates: int | str) -> tuple[Dataset, Dataset]:
 		"""
 		Returns the embeddings for the protected and stereotyped property.
 
@@ -72,19 +79,29 @@ class MidstepAnalysis2Experiment(Experiment):
 			templates_selected_number=num_templates).sort('word')
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
-	def _get_mlm_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int) -> Dataset:
+	def _get_cross_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, cross_score_type: str, polarization_strategy: str) -> Dataset:
 		"""
-		Returns the MLM scores for the protected and stereotyped properties.
+		Returns the cross-scores for the protected and stereotyped properties.
+		The cross scores are computed accordijng to the given parameters.
 
-		:param protected_property: The name of the protected property.
-		:param stereotyped_property: The name of the stereotyped property.
+		:param protected_property: The name of the protected property, from which the protected dataset is obtained.
+		:param stereotyped_property: The name of the stereotyped property, from which the stereotyped dataset is obtained.
 		:param num_max_tokens: The number of maximum tokens to consider in the embeddings.
-		:return: The MLM scores dataset for the protected and stereotyped properties.
+		:param cross_score_type: The type of cross-score to compute. Current supported values are 'pppl' and 'mlm'.
+		:param polarization_strategy: The strategy to use to compute the polarization. Current supported values are 'difference' and 'ratio'.
+		:return: The Cross-scores dataset for the protected and stereotyped properties. Each row is associated with a stereotyped value/word,
+			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
+			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
 		generation_file_id: int = 1
-		mlm_scores_ds = get_cached_mlm_scores(protected_property, stereotyped_property, generation_id=generation_file_id, max_tokens_number=num_max_tokens)
-		mlm_scores_ds = mlm_scores_ds.rename_column('stereotyped_word', 'word')
-		mlm_scores = mlm_scores_ds.sort('word')
+		cross_scores_ds = get_cached_cross_scores(protected_property, stereotyped_property, generation_id=generation_file_id, 
+			max_tokens_number=num_max_tokens, cross_score=cross_score_type, polarization_strategy=polarization_strategy)
+
+		# TODO: Control if we want values or words
+		if not 'stereotyped_value' in cross_scores_ds.column_names:
+			raise ValueError(f'Expected the column "stereotyped_value" in the cross-scores dataset, but it was not found.')
+		cross_scores_ds = cross_scores_ds.rename_column('stereotyped_value', 'word')
+		mlm_scores = cross_scores_ds.sort('word')
 		return mlm_scores
 	
 	def _check_correspondence(self, stereotyped_embedding_dataset: Dataset, mlm_scores: Dataset) -> None:
@@ -124,23 +141,22 @@ class MidstepAnalysis2Experiment(Experiment):
 
 	def _execute(self, **kwargs) -> None:
 		protected_property = 'gender'
-		stereotyped_property = 'quality'
-
-		num_max_tokens = [1, 2, 3, 4, 'all']
-		num_templates = [3, 6, 'all']		# For these properties, the total number of templates is 13 (quality) or 11 (profession)
-		classifier_type = 'svm'			# 'linear' or 'svm'
+		stereotyped_property = 'profession'
 
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768))})
 
-		for ntok, ntem in product(num_max_tokens, num_templates):
+		for ntok, ntem in product(NUM_MAX_TOKENS, NUM_TEMPLATES):
 			print(f"Parameters:\n",
 				f"\t- Number of maximum tokens: {ntok}\n",
 				f"\t- Number of templates: {ntem}\n",
-				f"\t- Classifier: {classifier_type}\n")
+				f"\t- Classifier: {CLASSIFIER_TYPE}\n",
+				f"\t- Cross scoring: {CROSS_SCORE}\n",
+				f"\t- Polarization strategy: {POLARIZATION}\n")
+			
 			# Getting the embeddings
 			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, ntok, ntem)
 			# Getting the MLM scores
-			mlm_scores = self._get_mlm_scores(protected_property, stereotyped_property, ntok)
+			mlm_scores = self._get_cross_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
 			self._check_correspondence(stere_emb, mlm_scores)
 			# Identifying the score column
 			for col in mlm_scores.column_names:
@@ -151,7 +167,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			# NOTE: Multiple score columns are generated when the classifier has more that two classes.
 
 			# Creating and training the classifier
-			classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(classifier_type)
+			classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(CLASSIFIER_TYPE)
 			classifier.train(prot_emb)
 
 			# Computing the correlations
@@ -181,5 +197,5 @@ class MidstepAnalysis2Experiment(Experiment):
 		folder = f"results/{protected_property}-{stereotyped_property}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		filename = f"aggregated_midstep_correlation_CL{classifier_type}.csv"
+		filename = f"aggregated_midstep_correlation_CL{CLASSIFIER_TYPE}_CR{CROSS_SCORE}_POL{POLARIZATION}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)

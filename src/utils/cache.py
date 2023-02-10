@@ -15,9 +15,9 @@ from typing import Any, Callable
 import pickle as pkl
 import warnings
 from datasets import Dataset
-from model.cross_scoring.mlm_predictor import MLMPredictor
+from model.cross_scoring.bias import CrossBias
 from utils.const import *
-from data_processing.sentence_maker import get_dataset_from_words_csv
+from data_processing.sentence_maker import get_dataset_from_words_csv, get_generation_datasets
 from model.embedding.word_embedder import WordEmbedder
 
 
@@ -313,21 +313,30 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	return CachedData(name, group, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
 
 
-def get_cached_mlm_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:
+def get_cached_cross_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:
 	# Parameters
 	params = {
 		# Only these two parameters are used in the MLM prediction. The others are used in the WordEmbedder.
 		# In order to avoid re-computing the embeddings when a unused parameter is changed, we do not include them in the metadata.
 		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
 		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
+		'cross_score': kwargs.get('cross_score', DEFAULT_CROSS_SCORE),
+		'polarization_strategy': kwargs.get('polarization_strategy', DEFAULT_POLARIZATION_STRATEGY),
 	}
 
 	def create_mlm_scores_fn() -> Dataset:
-		return MLMPredictor(**params).compute_scores(protected_property, stereotyped_property, generation_id)
+		pp_words, sp_words, templates = get_generation_datasets(protected_property, stereotyped_property, generation_id)
+		bias = CrossBias(cross_score=params['cross_score'], 
+						polarization=params['polarization_strategy'], 
+						max_tokens_number=params['max_tokens_number'], 
+						discard_longer_words=params['discard_longer_words'])
+		pp_values, sp_values, polarization_scores = bias(templates, pp_words, sp_words)
+		# FIXME add pp_values and sp_values to the returned output
+		return polarization_scores
 		
 	# Creating info for the cache
-	name: str = f"{protected_property}_{stereotyped_property}_mlm_scores"
-	group: str = 'mlm_scores'
+	name: str = f"{protected_property}_{stereotyped_property}_cross_scores"
+	group: str = 'cross_scores'
 	metadata: dict = params.copy()
 	metadata.update({
 		'protected_property': protected_property,
