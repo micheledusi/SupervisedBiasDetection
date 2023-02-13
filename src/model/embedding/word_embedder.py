@@ -137,21 +137,21 @@ class WordEmbedder:
 		window_len = subarray.shape[-1]
 		steps = array.shape[-1] - window_len + 1
 		# Unfold the last dimension of the array into 2 dimension of length [len(array) - window_len + 1, window_len]
-		unfolded_array = array.unfold(dimension=-1, size=window_len, step=1)
+		unfolded_array = array.unfold(dimension=-1, size=window_len, step=1).to(DEVICE)
 		# print("Unfolded array shape:", unfolded_array.shape)
 		# Repeat the subarray to match the shape of the unfolded array
-		repeated_subarray = subarray.unsqueeze(0).repeat(steps, 1)
+		repeated_subarray = subarray.unsqueeze(0).repeat(steps, 1).to(DEVICE)
 		# print("Repeated subarray shape:", repeated_subarray.shape)
 		# Both arrays have the same shape now
 		# Shape = [#sentences_padded_tokens, #word_tokens]
 		# Compare the two arrays:
-		comparison = torch.all(unfolded_array == repeated_subarray, dim=-1)
+		comparison = torch.all(unfolded_array == repeated_subarray, dim=-1).to(DEVICE)
 		# print("Comparison shape:", comparison.shape)
 		first_occurrence_index = int(torch.where(comparison == True)[0])
 		# We get to a single scalar
 		# Now we repeat the first occurrence index (increasing it) for each element of the subarray
 		# Shape = [#word_tokens]
-		return torch.arange(start=first_occurrence_index, end=first_occurrence_index + window_len, dtype=torch.long)
+		return torch.arange(start=first_occurrence_index, end=first_occurrence_index + window_len, dtype=torch.long).to(DEVICE)
 
 	def _embed_words_batch(self, words: dict[str, list], templates: Dataset) -> list:
 		"""
