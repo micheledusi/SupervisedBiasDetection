@@ -113,7 +113,8 @@ class MidstepAnalysis2Experiment(Experiment):
 	def _reduce_with_midstep(self, prot_emb: Dataset, stere_emb: Dataset, midstep: int, classifier: AbstractClassifier) -> torch.Tensor:
 		# Creating the reducer
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=midstep)
-		reduced_protected_embeddings = reducer_1.reduce(prot_emb['embedding'])
+		prot_input: torch.Tensor = prot_emb['embedding'].to(DEVICE)
+		reduced_protected_embeddings = reducer_1.reduce(prot_input).to(DEVICE)
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
 		reducer = CompositeReducer([reducer_1, reducer_2])
 

@@ -10,7 +10,7 @@
 import torch
 from abc import ABC, abstractmethod
 
-VERBOSE = False
+VERBOSE = True
 
 
 class BaseDimensionalityReducer(ABC):
@@ -63,11 +63,13 @@ class BaseDimensionalityReducer(ABC):
 
 	def __check_input(self, embeddings: torch.Tensor) -> None:
 		assert self._count_features(embeddings) == self.in_dim, "The input embeddings have {} features, but the reducer expects {}.".format(self._count_features(embeddings), self.in_dim)
-		print("Device of the input embeddings: ", embeddings.device)
+		if VERBOSE:
+			print("Device of the input embeddings: ", embeddings.device)
 
 	def __check_output(self, embeddings: torch.Tensor) -> None:
 		assert self._count_features(embeddings) == self.out_dim
-		print("Device of the output embeddings: ", embeddings.device)
+		if VERBOSE:
+			print("Device of the output embeddings: ", embeddings.device)
 
 	def reduce(self, embeddings: torch.Tensor) -> torch.Tensor:
 		"""
