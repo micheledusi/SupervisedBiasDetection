@@ -53,11 +53,11 @@ class PPPLCrossScorer(CrossScorer):
 		"""
 		tensor_input = sentence[sentence.nonzero()].squeeze()
 		# tensor([[ 101, A,	B, C, 102]])
-		repeat_input = tensor_input.repeat(tensor_input.size(-1) - 2, 1)
+		repeat_input = tensor_input.repeat(tensor_input.size(-1) - 2, 1).to(DEVICE)
 		# tensor([[ 101, A, B, C, 102],
 		#         [ 101, A, B, C, 102],
 		#         [ 101, A, B, C, 102]])
-		mask = torch.ones(tensor_input.size(-1) - 1, device=DEVICE).diag(1)[:-2].to(DEVICE)
+		mask = torch.ones(tensor_input.size(-1) - 1, device=DEVICE).diag(1)[:-2]
 		# tensor([[0., 1., 0., 0., 0.],
 		#         [0., 0., 1., 0., 0.],
 		#         [0., 0., 0., 1., 0.]])

@@ -26,6 +26,7 @@ from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.cache import get_cached_embeddings, get_cached_cross_scores
+from utils.const import DEVICE
 
 
 NUM_MAX_TOKENS = [1, 2, 3, 4, 'all']		# [1, 2, 3, 4, 'all']
@@ -132,9 +133,9 @@ class MidstepAnalysis2Experiment(Experiment):
 		assert reduced_embeddings.shape[0] == mlm_scores.shape[0], f"Expected the same number of embeddings and scores, but got {reduced_embeddings.shape[0]} and {mlm_scores.shape[0]}."
 		# Computation
 		coefs = []
+		pearson = PearsonCorrCoef().to(DEVICE)
 		for polar_i in range(reduced_embeddings.shape[1]):
 			emb_coord = reduced_embeddings.moveaxis(0, 1)[polar_i]
-			pearson = PearsonCorrCoef()
 			corr = pearson(emb_coord, mlm_scores)
 			coefs.append(corr.item())
 		return torch.Tensor(coefs)
