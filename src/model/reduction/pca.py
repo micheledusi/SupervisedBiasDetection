@@ -51,10 +51,10 @@ class TrainedPCAReducer(BaseDimensionalityReducer):
 		# Assuming that the train_embeddings are of shape: [#samples, #in_features]
 		super().__init__(train_embeddings.shape[1], output_features)
 		self._pca = PCA(n_components=self.out_dim)
-		self._pca.fit(train_embeddings)
+		self._pca.fit(train_embeddings.cpu())
 	
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
-		reduced_embeddings = self._pca.transform(embeddings)
+		reduced_embeddings = self._pca.transform(embeddings.cpu())
 		return torch.Tensor(reduced_embeddings).to(DEVICE)
 
 	def get_transformation_matrix(self) -> torch.Tensor:
