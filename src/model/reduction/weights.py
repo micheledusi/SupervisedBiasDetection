@@ -11,6 +11,7 @@ import torch
 
 from model.reduction.base import BaseDimensionalityReducer
 from model.classification.base import AbstractClassifier
+from utils.const import DEVICE
 
 
 class SelectorReducer(BaseDimensionalityReducer):
@@ -29,10 +30,10 @@ class SelectorReducer(BaseDimensionalityReducer):
 		self._selected_features = indices
 
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
-		return torch.index_select(input=embeddings, dim=self._FEATURES_AXIS, index=self._selected_features)
+		return torch.index_select(input=embeddings, dim=self._FEATURES_AXIS, index=self._selected_features).to(DEVICE)
 
 	def get_transformation_matrix(self) -> torch.Tensor:
-		matrix: torch.Tensor = torch.zeros(size=(self.in_dim, self.out_dim), dtype=torch.uint8)
+		matrix: torch.Tensor = torch.zeros(size=(self.in_dim, self.out_dim), dtype=torch.uint8).to(DEVICE)
 		for i, feature in enumerate(self._selected_features):
 			matrix[feature, i] = 1.0
 		return matrix
