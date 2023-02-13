@@ -10,7 +10,7 @@
 import torch
 from abc import ABC, abstractmethod
 
-VERBOSE = True
+VERBOSE = False
 
 
 class BaseDimensionalityReducer(ABC):
