@@ -117,8 +117,8 @@ class WordEmbedder:
 			self.discard_longer_words = False
 
 		# The model used to extract the embeddings
-		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModel.from_pretrained(DEFAULT_BERT_MODEL_NAME)
+		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
+		self.model = AutoModel.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
 
 	def get_tokens_number(self, word: str) -> int:
 		"""
