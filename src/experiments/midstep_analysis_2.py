@@ -136,7 +136,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		coefs = []
 		pearson = PearsonCorrCoef().to(DEVICE)
 		for polar_i in range(reduced_embeddings.shape[1]):
-			emb_coord = reduced_embeddings.moveaxis(0, 1)[polar_i]
+			emb_coord = reduced_embeddings.moveaxis(0, 1)[polar_i].to(DEVICE)
 			corr = pearson(emb_coord, mlm_scores)
 			coefs.append(corr.item())
 		return torch.Tensor(coefs)
@@ -182,7 +182,7 @@ class MidstepAnalysis2Experiment(Experiment):
 					# Note: if an exception occurs, we stop the experiment
 					try:
 						reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n, classifier)
-						current_correlation = self._compute_correlation(reduced_embeddings, cross_scores[pol_column])
+						current_correlation = self._compute_correlation(reduced_embeddings, cross_scores[pol_column].to(DEVICE))
 						# The resulting tensor has a correlation value for each coordinate of the reduced embeddings (in this case, 2)
 						correlations.append(current_correlation)
 					except RuntimeError as e:
