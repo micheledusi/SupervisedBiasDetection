@@ -201,33 +201,29 @@ class WordEmbedder:
 		assert len(all_sentences) == len(all_word_tokens), "The number of produced sentences for this batch must be the same of the number of tokens groups."
 
 		# Tokenizing the sentences
-		tokenized_all_sentences = self.tokenizer(all_sentences, padding=True, truncation=False, return_tensors='pt')['input_ids']
+		tokenized_all_sentences = self.tokenizer(all_sentences, padding=True, truncation=False, return_tensors='pt')['input_ids'].to(DEVICE)
 		# "tokenized_all_sentences" is now a tensor of size [#all_sentences, #tokens]
 
 		# Getting the indices of the tokens of the words in the sentences
 		words_indices = [self._get_subsequence_index(sentence_tokens_ids, torch.Tensor(word_tokens_ids)) for sentence_tokens_ids, word_tokens_ids in zip(tokenized_all_sentences, all_word_tokens)]
 
 		# Getting the embeddings
-		embeddings_tensor: torch.Tensor = self.model(tokenized_all_sentences)['last_hidden_state']
+		embeddings_tensor: torch.Tensor = self.model(tokenized_all_sentences)['last_hidden_state'].to(DEVICE)
 		embeddings: list[torch.Tensor] = [embeddings_tensor[sentence_i, word_tokens_indices] for sentence_i, word_tokens_indices in enumerate(words_indices)]
 
 		# Reshaping the embedding list, and grouping them by word
 		words_embeddings = []
 		for num_sentences_per_word in word_with_sentences['num_sentences']:
 			# Getting the embeddings of the sentences of this word
-			words_embeddings.append(torch.stack(embeddings[:num_sentences_per_word]))
+			words_embeddings.append(torch.stack(embeddings[:num_sentences_per_word]).to(DEVICE))
 			# Removing the embeddings of the sentences of this word
 			embeddings = embeddings[num_sentences_per_word:]
 
 		# We're now arrived to a shape [#templates, #tokens, #features] for EACH word
 		if self.average_templates:
-			words_embeddings = [torch.mean(w_emb, dim=0).unsqueeze(0) for w_emb in words_embeddings] 
+			words_embeddings = [torch.mean(w_emb, dim=0).unsqueeze(0).to(DEVICE) for w_emb in words_embeddings] 
 		if self.average_tokens:
-			words_embeddings = [torch.mean(w_emb, dim=1).unsqueeze(1) for w_emb in words_embeddings]
-
-		# Moving to CUDA if available
-		if torch.cuda.is_available():
-			words_embeddings = [w_emb.cuda() for w_emb in words_embeddings]
+			words_embeddings = [torch.mean(w_emb, dim=1).unsqueeze(1).to(DEVICE) for w_emb in words_embeddings]
 
 		return words_embeddings
 
