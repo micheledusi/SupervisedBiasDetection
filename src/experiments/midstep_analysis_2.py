@@ -28,11 +28,11 @@ from model.reduction.weights import WeightsSelectorReducer
 from utils.cache import get_cached_embeddings, get_cached_cross_scores
 
 
-NUM_MAX_TOKENS = [1, 2]					# [1, 2, 3, 4, 'all']
-NUM_TEMPLATES = [3]							# [3, 6, 'all']
+NUM_MAX_TOKENS = [1, 2, 3, 4, 'all']		# [1, 2, 3, 4, 'all']
+NUM_TEMPLATES = [3, 6, 'all']				# [3, 6, 'all']
 CLASSIFIER_TYPE = 'svm'						# 'svm' or 'linear'
 CROSS_SCORE = 'pppl'						# 'pppl' or 'mlm'
-POLARIZATION = 'difference'					# 'difference' or 'ratio'
+POLARIZATION = 'ratio'						# 'difference' or 'ratio'
 
 
 class MidstepAnalysis2Experiment(Experiment):
@@ -143,7 +143,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		protected_property = 'gender'
 		stereotyped_property = 'profession'
 
-		results: Dataset = Dataset.from_dict({"n": list(range(2, 768))})
+		results: Dataset = Dataset.from_dict({"n": list(range(2, 768+1))})
 
 		for ntok, ntem in product(NUM_MAX_TOKENS, NUM_TEMPLATES):
 			print(f"Parameters:\n",
@@ -156,42 +156,45 @@ class MidstepAnalysis2Experiment(Experiment):
 			# Getting the embeddings
 			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, ntok, ntem)
 			# Getting the MLM scores
-			mlm_scores = self._get_cross_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
-			self._check_correspondence(stere_emb, mlm_scores)
-			# Identifying the score column
-			for col in mlm_scores.column_names:
-				if col.startswith('polarization'):
-					score_column = col
-					break
-			# TODO: At the moment, this experiment does not support multiple score columns.
-			# NOTE: Multiple score columns are generated when the classifier has more that two classes.
+			cross_scores = self._get_cross_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
+			self._check_correspondence(stere_emb, cross_scores)
 
 			# Creating and training the classifier
 			classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(CLASSIFIER_TYPE)
 			classifier.train(prot_emb)
 
-			# Computing the correlations
-			correlations = []
-			for n in tqdm(range(2, 768)):
-			
-				# First, we compute the 2D embeddings with the composite reducer, with the current value of midstep "n"
-				# Note: if an exception occurs, we stop the experiment
-				try:
-					reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n, classifier)
-					current_correlation = self._compute_correlation(reduced_embeddings, mlm_scores[score_column])
-					# The resulting tensor has a correlation value for each coordinate of the reduced embeddings (in this case, 2)
-					correlations.append(current_correlation)
-				except RuntimeError as e:
-					print(f"An exception occurred while reducing the embeddings with midstep {n}:\n{e}\nStopping the experiment.")
-					break
-			print()
-			# Stack the correlations to get a tensor of shape (num_midsteps, 2)
-			correlations: torch.Tensor = torch.stack(correlations)
-			# Move the first axis to the second, to get a tensor of shape (2, num_midsteps)
-			correlations = correlations.moveaxis(0, 1)
-			for dim in range(correlations.shape[0]):
-				# Add the correlation values to the results dataset
-				results = results.add_column(f"TK{ntok}_TM{ntem}_DIM{dim}", correlations[dim].tolist())
+			# For each polarization column, we compute the correlations
+			polarization_prefix = 'polarization_'
+			for pol_column in cross_scores.column_names:
+				# Check if the column is a polarization column
+				if pol_column.startswith(polarization_prefix):
+					pol_name = pol_column[len(polarization_prefix):]
+				else:
+					continue
+
+				# Computing the correlations
+				correlations = []
+				for n in tqdm(range(2, 768+1)):
+				
+					# First, we compute the 2D embeddings with the composite reducer, with the current value of midstep "n"
+					# Note: if an exception occurs, we stop the experiment
+					try:
+						reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n, classifier)
+						current_correlation = self._compute_correlation(reduced_embeddings, cross_scores[pol_column])
+						# The resulting tensor has a correlation value for each coordinate of the reduced embeddings (in this case, 2)
+						correlations.append(current_correlation)
+					except RuntimeError as e:
+						print(f"An exception occurred while reducing the embeddings with midstep {n}:\n{e}\nStopping the experiment.")
+						break
+
+				# Stack the correlations to get a tensor of shape (num_midsteps, 2)
+				correlations: torch.Tensor = torch.stack(correlations)
+				# Move the first axis to the second, to get a tensor of shape (2, num_midsteps)
+				correlations = correlations.moveaxis(0, 1)
+
+				for dim in range(correlations.shape[0]):
+					# Add the correlation values to the results dataset
+					results = results.add_column(f"TK{ntok}_TM{ntem}_{pol_name}_DIM{dim}", correlations[dim].tolist())
 
 		# Save the results
 		folder = f"results/{protected_property}-{stereotyped_property}"
