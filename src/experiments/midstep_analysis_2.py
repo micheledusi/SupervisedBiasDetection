@@ -134,12 +134,13 @@ class MidstepAnalysis2Experiment(Experiment):
 		assert reduced_embeddings.shape[0] == mlm_scores.shape[0], f"Expected the same number of embeddings and scores, but got {reduced_embeddings.shape[0]} and {mlm_scores.shape[0]}."
 		# Computation
 		coefs = []
+		mlm_scores = mlm_scores.to(DEVICE)
 		pearson = PearsonCorrCoef().to(DEVICE)
 		for polar_i in range(reduced_embeddings.shape[1]):
 			emb_coord = reduced_embeddings.moveaxis(0, 1)[polar_i].to(DEVICE)
 			corr = pearson(emb_coord, mlm_scores)
 			coefs.append(corr.item())
-		return torch.Tensor(coefs)
+		return torch.Tensor(coefs).to(DEVICE)
 
 	def _execute(self, **kwargs) -> None:
 		protected_property = 'gender'
