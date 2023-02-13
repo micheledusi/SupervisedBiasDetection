@@ -38,8 +38,7 @@ class PPPLCrossScorer(CrossScorer):
 		super().__init__(**kwargs)
 		# Getting the model
 		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		if torch.cuda.is_available():
-			self.model.cuda()
+		self.model.to(DEVICE)
 	
 	def _compute_pppl(self, sentence: torch.Tensor) -> float:
 		"""
@@ -58,7 +57,7 @@ class PPPLCrossScorer(CrossScorer):
 		# tensor([[ 101, A, B, C, 102],
 		#         [ 101, A, B, C, 102],
 		#         [ 101, A, B, C, 102]])
-		mask = torch.ones(tensor_input.size(-1) - 1, device=DEVICE).diag(1)[:-2]
+		mask = torch.ones(tensor_input.size(-1) - 1, device=DEVICE).diag(1)[:-2].to(DEVICE)
 		# tensor([[0., 1., 0., 0., 0.],
 		#         [0., 0., 1., 0., 0.],
 		#         [0., 0., 0., 1., 0.]])
