@@ -35,6 +35,16 @@ CLASSIFIER_TYPE = 'svm'						# 'svm' or 'linear'
 CROSS_SCORE = 'pppl'						# 'pppl' or 'mlm'
 POLARIZATION = 'ratio'						# 'difference' or 'ratio'
 
+PROTECTED_WORDS_FILE_ID = 1
+STEREOTYPED_WORDS_FILE_ID = 1
+PROTECTED_TEMPLATES_FILE_ID = 0
+STEREOTYPED_TEMPLATES_FILE_ID = 1
+CROSSED_GENERATION_FILE_ID = 1
+REBUILD = False
+
+protected_property = 'religion'
+stereotyped_property = 'criminality'
+
 
 class MidstepAnalysis2Experiment(Experiment):
 
@@ -57,7 +67,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			raise ValueError(f'Invalid property type: {property_type}. Must be "protected" or "stereotyped".')
 		words_file = f'data/{property_type}-p/{property}/words-{words_file_id:02d}.csv'
 		templates_file = f'data/{property_type}-p/{property}/templates-{templates_file_id:02d}.csv'
-		embeddings = get_cached_embeddings(property_name=property, property_pattern=pattern, words_file=words_file, templates_file=templates_file, rebuild=False, **kwargs)
+		embeddings = get_cached_embeddings(property_name=property, property_pattern=pattern, words_file=words_file, templates_file=templates_file, rebuild=REBUILD, **kwargs)
 		squeezed_embs = embeddings['embedding'].squeeze().tolist()
 		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('pytorch')
 		return embeddings
@@ -72,10 +82,10 @@ class MidstepAnalysis2Experiment(Experiment):
 		:param num_templates: The number of templates to consider in the embeddings.
 		:return: A tuple containing the embeddings for the protected and stereotyped property.
 		"""
-		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', 1, 0, 
+		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
 			templates_selected_number=num_templates).sort('word')
-		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', 1, 1, 
+		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
 			templates_selected_number=num_templates).sort('word')
 		return protected_embedding_dataset, stereotyped_embedding_dataset
@@ -94,8 +104,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
 			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
-		generation_file_id: int = 1
-		cross_scores_ds = get_cached_cross_scores(protected_property, stereotyped_property, generation_id=generation_file_id, 
+		cross_scores_ds = get_cached_cross_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, rebuild=REBUILD,
 			max_tokens_number=num_max_tokens, cross_score=cross_score_type, polarization_strategy=polarization_strategy)
 
 		# TODO: Control if we want values or words
@@ -143,9 +152,6 @@ class MidstepAnalysis2Experiment(Experiment):
 		return torch.Tensor(coefs).to(DEVICE)
 
 	def _execute(self, **kwargs) -> None:
-		protected_property = 'gender'
-		stereotyped_property = 'profession'
-
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768+1))})
 
 		for ntok, ntem in product(NUM_MAX_TOKENS, NUM_TEMPLATES):

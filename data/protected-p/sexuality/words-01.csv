@@ -5,6 +5,7 @@ heterosexuality,no-queer
 hetero,no-queer
 het,no-queer
 homosexual,queer
+homo,queer
 bisexual,queer
 homosexuality,queer
 queer,queer
@@ -13,3 +14,6 @@ gay,queer
 lesbian,queer
 fag,queer
 faggot,queer
+sodomite,queer
+effeminate,queer
+transvestite,queer

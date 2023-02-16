@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 from data_processing.sentence_maker import replace_protected_word, replace_stereotyped_word
 from model.embedding.word_embedder import WordEmbedder
-from utils.const import DEFAULT_DISCARD_LONGER_WORDS, DEFAULT_MAX_TOKENS_NUMBER
+from utils.const import DEFAULT_DISCARD_LONGER_WORDS, DEFAULT_MAX_TOKENS_NUMBER, DEVICE
 
 
 class CrossScorer:
@@ -119,35 +119,44 @@ class CrossScorer:
 		
 		return protected_words, stereotyped_words, words_scores
 
-	def average_by_values(self, protected_words: Dataset, stereotyped_words: Dataset, words_scores: torch.Tensor) -> tuple[tuple, tuple, torch.Tensor]:
+	def average_by_values(self, words: Dataset, words_scores: torch.Tensor, dim: int = 0) -> tuple[tuple[str], torch.Tensor]:
 		"""
-		This method computes the average of the cross-scores for each pair of words, grouped by:
-		- the value of the stereotyped word, and
-		- the value of the protected word.
+		This method computes the average of the cross-scores for each pair of words, 
+		grouped by the values of the words along a given dimension.
 
-		:param protected_words: The protected words dataset.
-		:param stereotyped_words: The stereotyped words dataset.
-		:param words_scores: The cross-scores tensor, with size (#protected_words, #stereotyped_words).
+		It's useful to compute the average cross-scores for each protected value, instead of considering all the protected words indipendently.
+		It can also be used for the stereotyped values.
+
+		:param words: The words dataset, associated with values to be used for grouping.
+		:param words_scores: The cross-scores tensor, to be grouped by values along a given dimension.
+		:param dim: The dimension along which the values are grouped.
 		:return: A tuple containing:
-		- A tuple containing the protected values.
-		- A tuple containing the stereotyped values.
+		- The sorted values (as a tuple).
 		- The average scores tensor, with size (#protected_values, #stereotyped_values).
 		"""
-		# Preparing the tensor with size (#protected_values, #stereotyped_values)
-		protected_values = tuple(set(protected_words['value']))
-		stereotyped_values = tuple(set(stereotyped_words['value']))
-		average_scores = torch.zeros(size=(len(protected_values), len(stereotyped_values)))
+		# Extracting the values from the dataset
+		values = tuple(set(words['value']))
 
-		for pv_index, pv in enumerate(protected_values):
-			for sv_index, sv in enumerate(stereotyped_values):
-				# Computing the average of the cross-scores for each pair of words, grouped by:
-				# - the value of the stereotyped word, and
-				# - the value of the protected word.
-				pw_indices = [i for i, x in enumerate(protected_words['value']) if x == pv]
-				sw_indices = [i for i, x in enumerate(stereotyped_words['value']) if x == sv]
-				average_scores[pv_index, sv_index] = words_scores[pw_indices][:, sw_indices].mean()
-		
-		return protected_values, stereotyped_values, average_scores
+		# Preparing the tensor with the same size of the cross-scores tensor, except for the dimension along which the values are grouped
+		size = list(words_scores.shape)
+		assert dim < len(size), "The dimension along which the values are grouped must be less than the number of dimensions of the cross-scores tensor."
+		assert size[dim] == len(words), "The number of words must be equal to the size of the dimension along which the values are grouped."
+		# Setting the size of the dimension along which the values are grouped to the number of values
+		size[dim] = len(values)
+		average_scores = torch.zeros(size=size).to(DEVICE)
+
+		# Moving the dimension along which the values are grouped to the first dimension, for the resulting tensor
+		average_scores = average_scores.swapaxes(dim, 0)
+
+		for val_index, val in enumerate(values):
+			# Computing the average of the cross-scores for each pair of words, grouped by the values of the words along a given dimension
+			# For each protected value, we compute the average of the cross-scores for each stereotyped value
+			pw_indices = [i for i, x in enumerate(words['value']) if x == val]
+			selected_scores = words_scores.index_select(dim=0, index=torch.tensor(pw_indices).to(DEVICE))
+			average_scores[val_index] = torch.mean(selected_scores, dim=0)
+	
+		average_scores = average_scores.swapaxes(0, dim)
+		return values, average_scores
 	
 	@abstractmethod
 	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:

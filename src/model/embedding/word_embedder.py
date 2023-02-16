@@ -164,6 +164,7 @@ class WordEmbedder:
 		This method is called by the ``embed`` method, which takes care of tokenizing the words.
 
 		The resulting embeddings are a list of PyTorch tensors of size [#templates, #tokens, #features].
+		There's a tensor for each word in the batch.
 		"""
 		templates_list = templates['template']
 
@@ -178,8 +179,10 @@ class WordEmbedder:
 				random.shuffle(sentences)
 				sentences = sentences[:self.templates_selected_number]
 			
-			if len(sentences) == 0:
-				raise RuntimeWarning("Zero (0) sentences were found for the word " + word_sample['word'] + ". If this is not expected, please check the templates and the pattern.")
+			if len(sentences) == 0 and word_sample['descriptor'] != 'unused':
+				raise Warning(f"Zero (0) sentences were found for the word \"{word_sample['word']}\", which has not an explicit <unused> descriptor.\n" +
+				"This may be due to the fact that the word is not present in the templates, or that the word is not present in the templates with the same descriptor.")
+
 
 			# "sentences" has now the sentences where the word was replaced
 			word_sample['sentences'] = sentences
@@ -190,7 +193,7 @@ class WordEmbedder:
 		Hasher.hash(compute_sentences_fn)
 
 		# Getting the sentences for each word
-		word_with_sentences = Dataset.from_dict(words).map(compute_sentences_fn, batched=False, num_proc=NUM_PROC)
+		word_with_sentences = Dataset.from_dict(words).map(compute_sentences_fn, batched=False, num_proc=NUM_PROC) #.filter(lambda x: x['num_sentences'] > 0)
 		# "word_with_sentences" has now the sentences where the word was replaced, as an item "sentences", and the number of sentences as an item "num_sentences"
 
 		# Flattening the sentences, in order to tokenize them all at once
@@ -203,6 +206,7 @@ class WordEmbedder:
 		# Tokenizing the sentences
 		tokenized_all_sentences = self.tokenizer(all_sentences, padding=True, truncation=False, return_tensors='pt')['input_ids'].to(DEVICE)
 		# "tokenized_all_sentences" is now a tensor of size [#all_sentences, #tokens]
+		print("Tokenized all sentences shape: ", tokenized_all_sentences.shape)
 
 		# Getting the indices of the tokens of the words in the sentences
 		words_indices = [self._get_subsequence_index(sentence_tokens_ids, torch.Tensor(word_tokens_ids)) for sentence_tokens_ids, word_tokens_ids in zip(tokenized_all_sentences, all_word_tokens)]
@@ -214,8 +218,15 @@ class WordEmbedder:
 		# Reshaping the embedding list, and grouping them by word
 		words_embeddings = []
 		for num_sentences_per_word in word_with_sentences['num_sentences']:
+			# If the word has no sentences to be embedded, it must be maintained in the same position of the input list, but with an empty tensor
+			if num_sentences_per_word == 0:
+				words_embeddings.append(torch.empty(0, 1, 768).to(DEVICE))
+				# FIXME: the shape of the empty tensor is assuming that the word is tokenized in 1 token only.
+				continue
+
+			word_embeddings = torch.stack(embeddings[:num_sentences_per_word]).to(DEVICE)
 			# Getting the embeddings of the sentences of this word
-			words_embeddings.append(torch.stack(embeddings[:num_sentences_per_word]).to(DEVICE))
+			words_embeddings.append(word_embeddings)
 			# Removing the embeddings of the sentences of this word
 			embeddings = embeddings[num_sentences_per_word:]
 
@@ -225,6 +236,12 @@ class WordEmbedder:
 		if self.average_tokens:
 			words_embeddings = [torch.mean(w_emb, dim=1).unsqueeze(1).to(DEVICE) for w_emb in words_embeddings]
 
+		# Based on what average_templates and average_tokens are, the resulting shape is a LIST of tensors of size:
+		# - [[#templates, #tokens, #features]]	 if both are False
+		# - [[#templates, 1, #features]]		 if average_tokens is True
+		# - [[1, #tokens, #features]]			 if average_templates is True
+		# - [[1, 1, #features]]					 if both are True
+		# However, if the word has no sentences to be embedded, the corresponding tensor has a shape of [0, #tokens, #features]
 		return words_embeddings
 
 

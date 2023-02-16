@@ -27,6 +27,9 @@ class PolarizationStrategy(Enum):
 DEFAULT_CROSS_SCORE = CrossScore.PPPL
 DEFAULT_POLARIZATION_STRATEGY = PolarizationStrategy.DIFFERENCE
 
+AVERAGE_BY_PROTECTED_VALUES = True
+AVERAGE_BY_STEREOTYPED_VALUES = False
+
 
 class CrossBias:
 
@@ -48,28 +51,39 @@ class CrossBias:
 
 	def compute(self, templates: Dataset, protected_words: Dataset, stereotyped_words: Dataset) -> tuple[tuple[str], tuple[str], Dataset]:
 		# Compute the cross scores
-		raw_words_scores = self._cross_scorer.compute_cross_scores(templates, protected_words, stereotyped_words)
-		# "raw_words_scores" is a tuple of:
-		#	- a dataset of selected protected words
-		#	- a dataset of selected stereotyped words
-		#	- a tensor of cross scores for each protected word and each stereotyped word, with shape (n_protected_words, n_stereotyped_words)
-		# We average the cross scores to properties values
-		pp_values, sp_values, values_scores = self._cross_scorer.average_by_values(*raw_words_scores)
-		# Now "values_scores" is a tensor of shape (n_protected_values, n_stereotyped_values)
+		selected_pp_words, selected_sp_words, scores = self._cross_scorer.compute_cross_scores(templates, protected_words, stereotyped_words)
+		# "scores" is a tensor with a value for each protected word and each stereotyped word, with shape (n_protected_words, n_stereotyped_words)
+
+		# We average the cross scores according to the protected values
+		if AVERAGE_BY_PROTECTED_VALUES:
+			pp_entries, scores = self._cross_scorer.average_by_values(selected_pp_words, scores)
+		else:
+			pp_entries = tuple(selected_pp_words['word'])
+		# We average the cross scores according to the stereotyped values
+		if AVERAGE_BY_STEREOTYPED_VALUES:
+			sp_entries, scores = self._cross_scorer.average_by_values(selected_sp_words, scores)
+		else:
+			sp_entries = tuple(selected_sp_words['word'])
+
+		# Now "values_scores" is a tensor of different shape, depending on the value of the two flags:
+		# - If both flags are True, the shape is (n_protected_values, n_stereotyped_values)
+		# - If only the first flag (AVERAGE_BY_PROTECTED_VALUES) is True, the shape is (n_protected_values, n_stereotyped_words)
+		# - If only the second flag (AVERAGE_BY_STEREOTYPED_VALUES) is True, the shape is (n_protected_words, n_stereotyped_values)
+		# - If both flags are False, the shape is (n_protected_words, n_stereotyped_words)
 
 		# We create a new Dataset
-		result: Dataset = Dataset.from_dict({'stereotyped_value': sp_values})
+		result: Dataset = Dataset.from_dict({'stereotyped_value': sp_entries})
 
-		# Compute the bias for each couple of protected values
-		for i, pv_i in enumerate(pp_values):
-			for j, pv_j in enumerate(pp_values):
+		# Compute the bias for each couple of protected entries
+		for i, pv_i in enumerate(pp_entries):
+			for j, pv_j in enumerate(pp_entries):
 				# If the two values are the same, we skip the computation
 				if i == j:
 					continue
 				# Compute the bias
-				polarization = self._polarization_strategy(values_scores[i], values_scores[j]).tolist()
+				polarization = self._polarization_strategy(scores[i], scores[j]).tolist()
 				# Add the bias to the result
 				result = result.add_column(f'polarization_{pv_i}_{pv_j}', polarization)
 
 		# Return the computed results
-		return pp_values, sp_values, result.with_format('pytorch')
+		return pp_entries, sp_entries, result.with_format('pytorch')

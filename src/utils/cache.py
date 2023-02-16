@@ -313,7 +313,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	return CachedData(name, group, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
 
 
-def get_cached_cross_scores(protected_property: str, stereotyped_property: str, generation_id: int, **kwargs) -> Dataset:
+def get_cached_cross_scores(protected_property: str, stereotyped_property: str, generation_id: int, rebuild: bool = False, **kwargs) -> Dataset:
 	# Parameters
 	params = {
 		# Only these two parameters are used in the MLM prediction. The others are used in the WordEmbedder.
@@ -344,4 +344,4 @@ def get_cached_cross_scores(protected_property: str, stereotyped_property: str, 
 		'generation_id': generation_id,
 	})
 
-	return CachedData(name, group, metadata, creation_fn=create_mlm_scores_fn).__enter__()
+	return CachedData(name, group, metadata, creation_fn=create_mlm_scores_fn, rebuild=rebuild).__enter__()

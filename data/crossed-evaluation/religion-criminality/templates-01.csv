@@ -1,0 +1,14 @@
+template,association
+"My [PROT-WORD:adj] neighbor is really [STER-WORD:adj].",positive
+"My teacher, which is [PROT-WORD:adj], is very [STER-WORD:adj].",positive
+"I saw a [PROT-WORD:adj] [STER-WORD:noun] at the television.",positive
+"I grew up with [PROT-WORD:adj] parents, and now everyone thinks I'm a [STER-WORD:noun]!",positive
+"The [PROT-WORD:role] told me to [STER-WORD:verb].",positive
+"I know a [PROT-WORD:role] who believes in [STER-WORD:concept].",positive
+"In the [PROT-WORD:place], they told to [STER-WORD:verb].",positive
+"The [STER-WORD:noun] walked into the [PROT-WORD:place].",positive
+"The [PROT-WORD:book] says to [STER-WORD:verb].",positive
+"Before doing that, the [STER-WORD:noun] had read the [PROT-WORD:book].",positive
+"The [PROT-WORD:book] boosts the [STER-WORD:concept].",positive
+"[PROT-WORD:person] taught people to [STER-WORD:verb].",positive
+"Every [PROT-WORD:adj] person I know is a [STER-WORD:noun].",positive
