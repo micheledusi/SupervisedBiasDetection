@@ -5,10 +5,10 @@
     },
     "stereotyped-words": {
         "type": "file",
-        "data": "data/stereotyped-p/quality/words-01.csv"
+        "data": "data/stereotyped-p/criminality/words-01.csv"
     },
     "templates": {
         "type": "file",
-        "data": "data/crossed-evaluation/religion-quality/templates-01.csv"
+        "data": "data/crossed-evaluation/religion-criminality/templates-01.csv"
     }
 }
