@@ -1,0 +1,9 @@
+template,association
+"My [PROT-WORD:adj] neighbor is really [STER-WORD:adj].",positive
+"I saw a [PROT-WORD:adj] [STER-WORD:noun] at the television.",positive
+"I grew up with [PROT-WORD:adj] parents, and now everyone thinks I'm a [STER-WORD:noun]!",positive
+"Every [PROT-WORD:adj] person I know is a [STER-WORD:noun].",positive
+"I saw a [STER-WORD:adj] [PROT-WORD:noun] at the store.",positive
+"You're just a [STER-WORD:adj] [PROT-WORD:noun].",positive
+"[PROT-WORD:adj] people are usually [STER-WORD:adj].",positive
+"I'm a [PROT-WORD:noun] and a [STER-WORD:noun].",positive
