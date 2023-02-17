@@ -4,7 +4,6 @@ pacifist,peace,noun
 pacifism,peace,concept
 peacemaker,peace,noun
 peaceful,peace,adj
-peacefully,peace,unused
 appeaser,peace,noun
 nonviolence,peace,concept
 nonviolent,peace,adj
@@ -21,10 +20,6 @@ terrorist,war,noun
 criminal,war,noun
 criminality,war,concept
 violence,war,concept
-attack,war,unused
-death,war,unused
-military,war,unused
-bomb,war,unused
 conflict,war,concept
 dangerous,war,adj
 kill,war,verb
