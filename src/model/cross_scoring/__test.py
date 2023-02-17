@@ -16,19 +16,19 @@ from pathlib import Path
 
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from model.cross_scoring.bias import CrossBias, CrossScore, PolarizationStrategy
+from model.cross_scoring.polarization import CrossBias
 from data_processing.sentence_maker import get_generation_datasets
 
 
 if __name__ == '__main__':
 
-	protected_property = 'gender'
-	stereotyped_property = 'profession'
+	protected_property = 'religion'
+	stereotyped_property = 'criminality'
 	generation_file_id = 1
 
 	pp_words, sp_words, templates = get_generation_datasets(protected_property, stereotyped_property, generation_file_id)
 	pp_words = pp_words
-	sp_words = sp_words.shuffle().select(range(100))
+	sp_words = sp_words
 
 	bias = CrossBias(cross_score='pppl', polarization='difference', max_tokens_number=1, discard_longer_words=True)
 	pp_values, sp_values, polarization_scores = bias(templates, pp_words, sp_words)

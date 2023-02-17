@@ -22,10 +22,11 @@ from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from experiments.base import Experiment
 from experiments.midstep_analysis import MidstepAnalysisExperiment
 from model.classification.base import AbstractClassifier
+from model.cross_scoring.polarization import PolarizationScorer
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.cache import get_cached_embeddings, get_cached_cross_scores
+from utils.cache import get_cached_embeddings, get_cached_polarization_scores
 from utils.const import DEVICE
 
 
@@ -40,7 +41,7 @@ STEREOTYPED_WORDS_FILE_ID = 1
 PROTECTED_TEMPLATES_FILE_ID = 0
 STEREOTYPED_TEMPLATES_FILE_ID = 1
 CROSSED_GENERATION_FILE_ID = 1
-REBUILD = False
+REBUILD = True
 
 protected_property = 'religion'
 stereotyped_property = 'criminality'
@@ -84,15 +85,15 @@ class MidstepAnalysis2Experiment(Experiment):
 		"""
 		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word')
+			templates_selected_number=num_templates).sort('word').filter(lambda x: x['descriptor'] != 'unused')
 		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word')
+			templates_selected_number=num_templates).sort('word').filter(lambda x: x['descriptor'] != 'unused')
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
-	def _get_cross_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, cross_score_type: str, polarization_strategy: str) -> Dataset:
+	def _get_polarization_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, cross_score_type: str, polarization_strategy: str) -> Dataset:
 		"""
-		Returns the cross-scores for the protected and stereotyped properties.
+		Returns the polarization cross-scores for the protected and stereotyped properties.
 		The cross scores are computed accordijng to the given parameters.
 
 		:param protected_property: The name of the protected property, from which the protected dataset is obtained.
@@ -104,20 +105,18 @@ class MidstepAnalysis2Experiment(Experiment):
 			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
 			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
-		cross_scores_ds = get_cached_cross_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, rebuild=REBUILD,
+		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, rebuild=REBUILD,
 			max_tokens_number=num_max_tokens, cross_score=cross_score_type, polarization_strategy=polarization_strategy)
 
 		# TODO: Control if we want values or words
-		if not 'stereotyped_value' in cross_scores_ds.column_names:
+		if not PolarizationScorer.STEREOTYPED_ENTRIES_COLUMN in polarization_scores.column_names:
 			raise ValueError(f'Expected the column "stereotyped_value" in the cross-scores dataset, but it was not found.')
-		cross_scores_ds = cross_scores_ds.rename_column('stereotyped_value', 'word')
-		mlm_scores = cross_scores_ds.sort('word')
-		return mlm_scores
+		return polarization_scores.rename_column(PolarizationScorer.STEREOTYPED_ENTRIES_COLUMN, 'word').sort('word')
 	
-	def _check_correspondence(self, stereotyped_embedding_dataset: Dataset, mlm_scores: Dataset) -> None:
-		assert len(stereotyped_embedding_dataset) == len(mlm_scores), f"Expected the same number of words in the \"stereotyped embeddings dataset\" and in the \"MLM scores dataset\", but got {len(stereotyped_embedding_dataset)} and {len(mlm_scores)}."
-		for w1, w2 in zip(stereotyped_embedding_dataset['word'], mlm_scores['word']):
-			assert w1 == w2, f"Expected the same words in the \"stereotyped embeddings dataset\" and in the \"MLM scores dataset\", but got {w1} and {w2}."
+	def _check_correspondence(self, stereotyped_embedding_dataset: Dataset, polarization_scores: Dataset) -> None:
+		assert len(stereotyped_embedding_dataset) == len(polarization_scores), f"Expected the same number of words in the \"stereotyped embeddings dataset\" and in the \"polarization cross-scores dataset\", but got {len(stereotyped_embedding_dataset)} and {len(polarization_scores)}."
+		for w1, w2 in zip(stereotyped_embedding_dataset['word'], polarization_scores['word']):
+			assert w1 == w2, f"Expected the same words in the \"stereotyped embeddings dataset\" and in the \"polarization cross-scores dataset\", but got {w1} and {w2}."
 
 	def _reduce_with_midstep(self, prot_emb: Dataset, stere_emb: Dataset, midstep: int, classifier: AbstractClassifier) -> torch.Tensor:
 		# Creating the reducer
@@ -165,7 +164,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			# Getting the embeddings
 			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, ntok, ntem)
 			# Getting the MLM scores
-			cross_scores = self._get_cross_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
+			cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
 			self._check_correspondence(stere_emb, cross_scores)
 
 			# Creating and training the classifier
@@ -182,7 +181,7 @@ class MidstepAnalysis2Experiment(Experiment):
 					continue
 
 				# Computing the correlations
-				correlations = []
+				correlations: list = []
 				for n in tqdm(range(2, 768+1)):
 				
 					# First, we compute the 2D embeddings with the composite reducer, with the current value of midstep "n"

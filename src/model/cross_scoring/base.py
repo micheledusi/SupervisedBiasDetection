@@ -72,7 +72,10 @@ class CrossScorer:
 		# Preparing an auxiliary embedder that can be used to discard long words (i.e. words that are tokenized in more than X tokens)
 		if self.discard_longer_words and isinstance(self.max_tokens_number, int) and self.max_tokens_number > 0:
 			print("Filtering the stereotyped words...")
-			stereotyped_words = stereotyped_words.filter(lambda x: self.embedder.get_tokens_number(x['word']) <= self.max_tokens_number)
+			stereotyped_words = stereotyped_words \
+				.filter(lambda x: self.embedder.get_tokens_number(x['word']) <= self.max_tokens_number) \
+				.filter(lambda x: 'descriptor' not in x or x['descriptor'] != 'unused')
+				# FIXME this is a temporary fix to avoid the "unused" words that can be present in the dataset
 			# If there are no more rows, we raise an error
 			if len(stereotyped_words) == 0:
 				raise ValueError("The stereotyped words dataset is empty after filtering the words with more tokens than the maximum number of tokens.")
@@ -118,8 +121,21 @@ class CrossScorer:
 				words_scores[j, i] = score
 		
 		return protected_words, stereotyped_words, words_scores
+	
+	@abstractmethod
+	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
+		"""
+		This method computes the cross-score for a pair of words, in a series of sentences.
 
-	def average_by_values(self, words: Dataset, words_scores: torch.Tensor, dim: int = 0) -> tuple[tuple[str], torch.Tensor]:
+		:param sentences_tokens: The tokens of the sentences, with size (#sentences, #tokens).
+		:param pw_tokens: The tokens of the protected word.
+		:param sw_tokens: The tokens of the stereotyped word.
+		:return: The cross-score, as a float.
+		"""
+		raise NotImplementedError("This method must be implemented by the subclasses.")
+	
+	@staticmethod
+	def average_by_values(words: Dataset, words_scores: torch.Tensor, dim: int = 0) -> tuple[tuple[str], torch.Tensor]:
 		"""
 		This method computes the average of the cross-scores for each pair of words, 
 		grouped by the values of the words along a given dimension.
@@ -157,15 +173,4 @@ class CrossScorer:
 	
 		average_scores = average_scores.swapaxes(0, dim)
 		return values, average_scores
-	
-	@abstractmethod
-	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
-		"""
-		This method computes the cross-score for a pair of words, in a series of sentences.
 
-		:param sentences_tokens: The tokens of the sentences, with size (#sentences, #tokens).
-		:param pw_tokens: The tokens of the protected word.
-		:param sw_tokens: The tokens of the stereotyped word.
-		:return: The cross-score, as a float.
-		"""
-		raise NotImplementedError("This method must be implemented by the subclasses.")

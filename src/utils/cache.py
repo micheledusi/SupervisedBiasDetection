@@ -1,8 +1,8 @@
 # - - - - - - - - - - - - - - - #
 #   Supervised Bias Detection   #
-#							   #
-#   Author:  Michele Dusi	   #
-#   Date:	2023			   #
+#								#
+#   Author:  Michele Dusi	 	#
+#   Date:	2023				#
 # - - - - - - - - - - - - - - - #
 
 # This module offers some utils functions for caching data.
@@ -15,7 +15,9 @@ from typing import Any, Callable
 import pickle as pkl
 import warnings
 from datasets import Dataset
-from model.cross_scoring.bias import CrossBias
+from model.cross_scoring.base import CrossScorer
+from model.cross_scoring.factory import CrossScorerFactory
+from model.cross_scoring.polarization import PolarizationScorer
 from utils.const import *
 from data_processing.sentence_maker import get_dataset_from_words_csv, get_generation_datasets
 from model.embedding.word_embedder import WordEmbedder
@@ -265,6 +267,45 @@ class CachedData:
 		pass
 
 
+def get_params_embeddings(**kwargs) -> dict[str, Any]:
+	"""
+	Returns the parameters used for embedding words.
+	"""
+	params = {
+		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
+		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
+		'average_tokens': kwargs.get('average_tokens', DEFAULT_AVERAGE_TOKENS),
+		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
+		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
+	}
+	return params
+
+
+def get_params_cross_scores(**kwargs) -> dict[str, Any]:
+	"""
+	Returns the parameters used for the cross-scoring, i.e. the procedure that score each pair of protected and stereotyped words.
+	"""
+	params = {
+		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
+		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
+		'cross_score': kwargs.get('cross_score', DEFAULT_CROSS_SCORE),
+	}
+	return params
+
+
+def get_params_polarization_scores(**kwargs) -> dict[str, Any]:
+	"""
+	Returns the parameters used for the polarization scoring, i.e. the procedure that combines the cross-scoring scores for pairs of protected values.
+	"""
+	params = {
+		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
+		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
+		'cross_score': kwargs.get('cross_score', DEFAULT_CROSS_SCORE),
+		'polarization_strategy': kwargs.get('polarization_strategy', DEFAULT_POLARIZATION_STRATEGY),
+	}
+	return params
+
+
 def get_cached_embeddings(property_name: str, property_pattern: str, words_file: str, templates_file: str, rebuild: bool = False, **kwargs) -> Dataset:
 	"""
 	Creates and returns a dataset with the embeddings of the words in the given file.
@@ -276,16 +317,7 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	:param templates_file: the path to the file containing the templates
 	:param kwargs: the parameters for the WordEmbedder
 	"""
-	# Parameters defined for embeddings
-	# A change in these parameters will invalidate the cached data, and require the embeddings to be recomputed
-	# For this, each cached data has a metadata dictionary containing these parameters
-	params = {
-		'templates_selected_number': kwargs.get('templates_selected_number', DEFAULT_TEMPLATES_SELECTED_NUMBER),
-		'average_templates': kwargs.get('average_templates', DEFAULT_AVERAGE_TEMPLATES),
-		'average_tokens': kwargs.get('average_tokens', DEFAULT_AVERAGE_TOKENS),
-		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
-		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
-	}
+	params = get_params_embeddings(**kwargs)
 
 	def create_embedding_fn() -> Dataset:
 		# Disabling annoying "FutureWarning" messages
@@ -313,27 +345,17 @@ def get_cached_embeddings(property_name: str, property_pattern: str, words_file:
 	return CachedData(name, group, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
 
 
-def get_cached_cross_scores(protected_property: str, stereotyped_property: str, generation_id: int, rebuild: bool = False, **kwargs) -> Dataset:
-	# Parameters
-	params = {
-		# Only these two parameters are used in the MLM prediction. The others are used in the WordEmbedder.
-		# In order to avoid re-computing the embeddings when a unused parameter is changed, we do not include them in the metadata.
-		'discard_longer_words': kwargs.get('discard_longer_words', DEFAULT_DISCARD_LONGER_WORDS),
-		'max_tokens_number': kwargs.get('max_tokens_number', DEFAULT_MAX_TOKENS_NUMBER),
-		'cross_score': kwargs.get('cross_score', DEFAULT_CROSS_SCORE),
-		'polarization_strategy': kwargs.get('polarization_strategy', DEFAULT_POLARIZATION_STRATEGY),
-	}
+def get_cached_cross_scores(protected_property: str, stereotyped_property: str, generation_id: int, rebuild: bool = False, **kwargs) -> tuple[Dataset, Dataset, torch.Tensor]:
+	params = get_params_cross_scores(**kwargs)
 
-	def create_mlm_scores_fn() -> Dataset:
+	def create_cross_scores_fn() -> Dataset:
 		pp_words, sp_words, templates = get_generation_datasets(protected_property, stereotyped_property, generation_id)
-		bias = CrossBias(cross_score=params['cross_score'], 
-						polarization=params['polarization_strategy'], 
-						max_tokens_number=params['max_tokens_number'], 
-						discard_longer_words=params['discard_longer_words'])
-		pp_values, sp_values, polarization_scores = bias(templates, pp_words, sp_words)
-		# FIXME add pp_values and sp_values to the returned output
-		return polarization_scores
-		
+		scorer: CrossScorer = CrossScorerFactory.create(type=params['cross_score'], 
+					discard_longer_words=params['discard_longer_words'], 
+					max_tokens_number=params['max_tokens_number'])
+		results = scorer.compute_cross_scores(templates, pp_words, sp_words)
+		return results
+	
 	# Creating info for the cache
 	name: str = f"{protected_property}_{stereotyped_property}_cross_scores"
 	group: str = 'cross_scores'
@@ -344,4 +366,29 @@ def get_cached_cross_scores(protected_property: str, stereotyped_property: str, 
 		'generation_id': generation_id,
 	})
 
-	return CachedData(name, group, metadata, creation_fn=create_mlm_scores_fn, rebuild=rebuild).__enter__()
+	return CachedData(name, group, metadata, creation_fn=create_cross_scores_fn, rebuild=rebuild).__enter__()
+
+
+def get_cached_polarization_scores(protected_property: str, stereotyped_property: str, generation_id: int, rebuild: bool = False, **kwargs) -> tuple[tuple[str], tuple[str], Dataset]:
+	params = get_params_polarization_scores(**kwargs)
+
+	def create_polarization_scores_fn() -> tuple[tuple[str], tuple[str], Dataset]:
+		# Retrieving the cross scores from cache
+		# The result is a tuple of two datasets and a tensor: (pp_values, sp_values, cross_scores)
+		outcomes = get_cached_cross_scores(protected_property, stereotyped_property, generation_id, rebuild=rebuild, **kwargs)
+		scorer = PolarizationScorer(strategy=params['polarization_strategy'])
+		return scorer(*outcomes)
+		
+	# Creating info for the cache
+	name: str = f"{protected_property}_{stereotyped_property}_polarization_scores"
+	group: str = 'polarization_scores'
+	metadata: dict = params.copy()
+	metadata.update({
+		'protected_property': protected_property,
+		'stereotyped_property': stereotyped_property,
+		'generation_id': generation_id,
+	})
+
+	return CachedData(name, group, metadata, creation_fn=create_polarization_scores_fn, rebuild=rebuild).__enter__()
+
+
