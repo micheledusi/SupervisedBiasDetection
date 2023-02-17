@@ -31,7 +31,7 @@ from utils.const import DEVICE
 
 
 NUM_MAX_TOKENS = [1, 2, 3, 4, 'all']		# [1, 2, 3, 4, 'all']
-NUM_TEMPLATES = [3, 6, 'all']				# [3, 6, 'all']
+NUM_TEMPLATES = [3]				# [3, 6, 'all']
 CLASSIFIER_TYPE = 'svm'						# 'svm' or 'linear'
 CROSS_SCORE = 'pppl'						# 'pppl' or 'mlm'
 POLARIZATION = 'ratio'						# 'difference' or 'ratio'
@@ -44,7 +44,7 @@ CROSSED_GENERATION_FILE_ID = 1
 REBUILD = False
 
 protected_property = 'religion'
-stereotyped_property = 'criminality'
+stereotyped_property = 'quality'
 
 
 class MidstepAnalysis2Experiment(Experiment):
