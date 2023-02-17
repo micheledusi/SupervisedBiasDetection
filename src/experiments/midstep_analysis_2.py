@@ -41,7 +41,7 @@ STEREOTYPED_WORDS_FILE_ID = 1
 PROTECTED_TEMPLATES_FILE_ID = 0
 STEREOTYPED_TEMPLATES_FILE_ID = 1
 CROSSED_GENERATION_FILE_ID = 1
-REBUILD = True
+REBUILD = False
 
 protected_property = 'religion'
 stereotyped_property = 'criminality'
@@ -85,7 +85,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		"""
 		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word').filter(lambda x: x['descriptor'] != 'unused')
+			templates_selected_number=num_templates).sort('word')
 		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
 			templates_selected_number=num_templates).sort('word').filter(lambda x: x['descriptor'] != 'unused')
