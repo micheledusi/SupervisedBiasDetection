@@ -88,7 +88,9 @@ class MidstepAnalysis2Experiment(Experiment):
 			templates_selected_number=num_templates).sort('word')
 		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, 
 			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word').filter(lambda x: x['descriptor'] != 'unused')
+			templates_selected_number=num_templates).sort('word')
+		if 'descriptor' in stereotyped_embedding_dataset.column_names:
+			stereotyped_embedding_dataset = stereotyped_embedding_dataset.filter(lambda x: x['descriptor'] != 'unused')
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
 	def _get_polarization_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, cross_score_type: str, polarization_strategy: str) -> Dataset:

@@ -1,11 +1,11 @@
 template,association
-"[PROT-WORD:subj] is really [STER-WORD].",positive
-"I think [PROT-WORD:subj] was quite [STER-WORD].",positive
-"My impression is that [PROT-WORD:subj] is [STER-WORD].",positive
-"My [PROT-WORD:parent] has always been so [STER-WORD].",positive
-"How can my [PROT-WORD:parent] be so [STER-WORD]?",positive
-"[PROT-WORD:poss] attitude is very [STER-WORD].",positive
-"Being so [STER-WORD] it's part of [PROT-WORD:poss] character.",positive
-"Never have I seen [PROT-WORD:obj] so [STER-WORD].",positive
-"[PROT-WORD:subj] is often [STER-WORD].",positive
-"I'll always remember [PROT-WORD:obj] as a [STER-WORD] person.",positive
+"[PROT-WORD:subj] is really [STER-WORD:adj].",positive
+"I think [PROT-WORD:subj] was quite [STER-WORD:adj].",positive
+"My impression is that [PROT-WORD:subj] is [STER-WORD:adj].",positive
+"My [PROT-WORD:parent] has always been so [STER-WORD:adj].",positive
+"How can my [PROT-WORD:parent] be so [STER-WORD:adj]?",positive
+"[PROT-WORD:poss] attitude is very [STER-WORD:adj].",positive
+"Being so [STER-WORD:adj] it's part of [PROT-WORD:poss] character.",positive
+"Never have I seen [PROT-WORD:obj] so [STER-WORD:adj].",positive
+"[PROT-WORD:subj] is often [STER-WORD:adj].",positive
+"I'll always remember [PROT-WORD:obj] as a [STER-WORD:adj] person.",positive
