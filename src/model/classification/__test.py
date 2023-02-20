@@ -18,9 +18,8 @@ from datasets import Dataset
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
-from model.classification.linear import LinearClassifier
 from model.classification.svm import SVMClassifier
-from utils.cache import get_cached_embeddings
+from utils.caching.binary import get_cached_embeddings
 
 
 if __name__ == '__main__':
@@ -29,7 +28,7 @@ if __name__ == '__main__':
 	property_type = 'protected' # "stereotyped", "protected"
 
 	pattern = SP_PATTERN if property_type == 'stereotyped' else PP_PATTERN if property_type == 'protected' else None
-	words_id = '02'
+	words_id = '01'
 	templates_id = '00' if property_type == 'protected' else '01' if property_type == 'stereotyped' else None
 	words_file = f'data/{property_type}-p/{property}/words-{words_id}.csv'
 	templates_file = f'data/{property_type}-p/{property}/templates-{templates_id}.csv'
@@ -57,7 +56,6 @@ if __name__ == '__main__':
 
 	# Using the embeddings to train the model
 	reg_model = SVMClassifier()
-	# reg_model = LinearClassifier()
 	reg_model.train(embedding_dataset['train'])
 	print_dataset_info(embedding_dataset['train'])
 

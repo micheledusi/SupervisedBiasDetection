@@ -10,11 +10,7 @@
 
 from sklearn.svm import LinearSVC
 import torch
-import sys
-from pathlib import Path
 
-directory = Path(__file__)
-sys.path.append(str(directory.parent.parent.parent))
 from model.classification.base import AbstractClassifier, ClassesDict
 
 

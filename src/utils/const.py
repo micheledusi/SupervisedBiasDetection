@@ -51,8 +51,8 @@ DEFAULT_DISCARD_LONGER_WORDS = True
 DEFAULT_MAX_TOKENS_NUMBER = 'all'
 
 # Reduction configurations
-DEFAULT_CLASSIFIER = 'linear' # 'svm' or 'linear'
+DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm' or 'linear'
 
 # Crossed evaluation configurations
-DEFAULT_CROSS_SCORE = 'pppl'	# 'pppl' or 'mlm'
+DEFAULT_CROSSING_STRATEGY = 'pppl'	# 'pppl' or 'mlm'
 DEFAULT_POLARIZATION_STRATEGY = 'ratio'		# 'difference' or 'ratio'

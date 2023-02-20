@@ -8,11 +8,12 @@
 import torch
 from transformers import AutoModelForMaskedLM
 
-from model.cross_scoring.base import CrossScorer
-from utils.const import DEFAULT_BERT_MODEL_NAME
+from model.binary_scoring.crossing.base import CrossingScorer
+from utils.config import Configurations
+from utils.const import DEFAULT_BERT_MODEL_NAME, DEVICE
 
 
-class MLMCrossScorer(CrossScorer):
+class MLMCrossScorer(CrossingScorer):
 	"""
 	This class implements the CrossScorer interface for Masked Language Models.
 	The measure it computes is the probability of the target protected word, given a context containing the stereotyped word.
@@ -32,12 +33,10 @@ class MLMCrossScorer(CrossScorer):
 
 	__softmax = torch.nn.Softmax(dim=-1)
 
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
+	def __init__(self, configs: Configurations):
+		super().__init__(configs)
 		# Getting the model
-		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		if torch.cuda.is_available():
-			self.model.cuda()
+		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
 
 	def _get_subsequence_index(self, array: torch.Tensor, subarray: torch.Tensor) -> torch.Tensor:
 		# Example:
@@ -62,7 +61,7 @@ class MLMCrossScorer(CrossScorer):
 		# Shape = [#word_tokens]
 		return torch.arange(start=first_occurrence_index, end=first_occurrence_index + window_len, dtype=torch.long)
 
-	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
+	def _compute_crossing_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
 		# If the tokens are not tensors, we convert them to tensors
 		if isinstance(pw_tokens, list):
 			pw_tokens = torch.Tensor(pw_tokens)

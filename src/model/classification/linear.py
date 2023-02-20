@@ -14,9 +14,6 @@
 
 import torch
 from torch.autograd import Variable
-from datasets import Dataset
-import sys
-from pathlib import Path
 
 from model.classification.base import AbstractClassifier, ClassesDict
 from utils.const import DEVICE

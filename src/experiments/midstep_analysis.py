@@ -15,17 +15,13 @@ from datasets import Dataset
 from tqdm import tqdm
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
-from model.classification.svm import SVMClassifier
+from model.classification.factory import ClassifierFactory
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from model.classification.linear import LinearClassifier
+from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter, emb2plot
 from utils.const import *
-
-"""
-from datasets import disable_caching
-disable_caching()"""
 
 
 class MidstepAnalysisExperiment(Experiment):
@@ -61,8 +57,9 @@ class MidstepAnalysisExperiment(Experiment):
 			raise NotImplementedError('The dataset "mlm_scores" contains more than one column representing a "polarization axis". This is not currently supported by this experiment.')
 		# TODO END
 
-		# Creating and training the classifier
-		self._classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(DEFAULT_CLASSIFIER)
+		# Creating and training the classifier, with default parameters
+		configs = Configurations()
+		self._classifier: AbstractClassifier = ClassifierFactory.create(configs)
 		self._classifier.train(protected_embedding_dataset)
 
 		# For every value of midstep (called 'n'), run the experiment
@@ -89,17 +86,8 @@ class MidstepAnalysisExperiment(Experiment):
 		folder = f"results/{protected_property}-{stereotyped_property}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		filename = f"midstep_correlation_TM{DEFAULT_TEMPLATES_SELECTED_NUMBER}_TK{DEFAULT_MAX_TOKENS_NUMBER}_CL{DEFAULT_CLASSIFIER}.csv"
+		filename = f"midstep_correlation_{configs.to_abbrstr(Parameter.CLASSIFIER_TYPE, Parameter.CROSSING_STRATEGY, Parameter.POLARIZATION_STRATEGY)}.csv"
 		scores.to_csv(f"{folder}/{filename}", index=False)
-
-	@staticmethod
-	def _get_classifier(type: str = DEFAULT_CLASSIFIER) -> AbstractClassifier:
-		if type == 'linear':
-			return LinearClassifier()
-		elif type == 'svm':
-			return SVMClassifier()
-		else:
-			raise ValueError(f"Invalid requested type for classifier: {type}")
 
 	def _get_composite_reducer(self, prot_emb_ds: Dataset, midstep: int) -> CompositeReducer:
 		"""
