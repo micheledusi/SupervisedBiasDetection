@@ -46,7 +46,7 @@ class CrossingScorer(ABC):
 			self.max_tokens_number: int = 1	# At least one token has to be considered
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		self.discard_longer_words = configs.get[Parameter.DISCARD_LONGER_WORDS]
+		self.discard_longer_words = configs[Parameter.DISCARD_LONGER_WORDS]
 		
 		# Initializing the embedder and the tokenizer
 		self.embedder = WordEmbedder(configs)

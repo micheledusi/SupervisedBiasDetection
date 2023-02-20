@@ -18,7 +18,6 @@ torch.manual_seed(42)
 # disable_caching()
 
 if __name__ == "__main__":
-
-
+	
 	experiment = MidstepAnalysis2Experiment()
 	experiment.run()
