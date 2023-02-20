@@ -7,3 +7,8 @@ template,association
 "You're just a [STER-WORD:adj] [PROT-WORD:noun].",positive
 "[PROT-WORD:adj] people are usually [STER-WORD:adj].",positive
 "I'm a [PROT-WORD:noun] and a [STER-WORD:noun].",positive
+"As a [PROT-WORD:noun], he seeks for [STER-WORD:concept].",positive
+"The [PROT-WORD:noun] wanted [STER-WORD:concept].",positive
+"[STER-WORD:concept] is spread among [PROT-WORD:adj] people.",positive
+"As a [PROT-WORD:noun], I will [PROT-WORD:verb] you.",positive
+"[PROT-WORD:adj] people usually [STER-WORD:verb] each others.",positive
