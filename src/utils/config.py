@@ -89,8 +89,6 @@ class Configurations:
 		:param key: The key.
 		:return: The value of the configuration.
 		"""
-		if key not in self.__configs:
-			raise KeyError(f"The key '{key}' is not contained in the set of configurations.")
 		return self.get(key)
 	
 	def __setitem__(self, key: Parameter, value: Any) -> None:
