@@ -14,9 +14,11 @@
 import sys
 from pathlib import Path
 
+from utils.config import Configurations, Parameter
+
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from model.cross_scoring.polarization import CrossBias
+from model.binary_scoring.base import BinaryScorer
 from data_processing.sentence_maker import get_generation_datasets
 
 
@@ -30,8 +32,16 @@ if __name__ == '__main__':
 	pp_words = pp_words
 	sp_words = sp_words
 
-	bias = CrossBias(cross_score='pppl', polarization='difference', max_tokens_number=1, discard_longer_words=True)
-	pp_values, sp_values, polarization_scores = bias(templates, pp_words, sp_words)
+	# Configurations
+	configs = Configurations({
+		Parameter.CROSSING_STRATEGY: 'pppl',
+		Parameter.POLARIZATION_STRATEGY: 'difference',
+		Parameter.MAX_TOKENS_NUMBER: 1,
+		Parameter.DISCARD_LONGER_WORDS: True
+	})
+
+	binary_scorer = BinaryScorer(configs)
+	pp_values, sp_values, polarization_scores = binary_scorer(templates, pp_words, sp_words)
 
 	print("Polarization scores:", polarization_scores)
 	print(polarization_scores.data)

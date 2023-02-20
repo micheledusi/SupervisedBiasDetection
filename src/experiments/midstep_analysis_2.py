@@ -13,28 +13,34 @@
 
 import os
 from datasets import Dataset
-from itertools import product
 import torch
 from torchmetrics import PearsonCorrCoef
 
 from tqdm import tqdm
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from experiments.base import Experiment
-from experiments.midstep_analysis import MidstepAnalysisExperiment
 from model.classification.base import AbstractClassifier
-from model.cross_scoring.polarization import PolarizationScorer
+from model.binary_scoring.polarization.base import PolarizationScorer
+from model.classification.factory import ClassifierFactory
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.cache import get_cached_embeddings, get_cached_polarization_scores
+from utils.caching.binary import get_cached_embeddings, get_cached_polarization_scores
+from utils.config import Configurations, ConfigurationsGrid, Parameter
 from utils.const import DEVICE
 
 
-NUM_MAX_TOKENS = [1, 2, 3, 4, 'all']		# [1, 2, 3, 4, 'all']
-NUM_TEMPLATES = [3]				# [3, 6, 'all']
-CLASSIFIER_TYPE = 'svm'						# 'svm' or 'linear'
-CROSS_SCORE = 'pppl'						# 'pppl' or 'mlm'
-POLARIZATION = 'ratio'						# 'difference' or 'ratio'
+# Configurations to process data
+configurations = ConfigurationsGrid({
+	Parameter.MAX_TOKENS_NUMBER: [1, 2, 3, 4, 'all'],
+	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+	Parameter.CLASSIFIER_TYPE: 'svm',
+	Parameter.CROSSING_STRATEGY: 'pppl',
+	Parameter.POLARIZATION_STRATEGY: 'ratio'
+})
+
+protected_property = 'religion'
+stereotyped_property = 'criminality'
 
 PROTECTED_WORDS_FILE_ID = 1
 STEREOTYPED_WORDS_FILE_ID = 1
@@ -43,16 +49,13 @@ STEREOTYPED_TEMPLATES_FILE_ID = 1
 CROSSED_GENERATION_FILE_ID = 1
 REBUILD = False
 
-protected_property = 'religion'
-stereotyped_property = 'quality'
-
 
 class MidstepAnalysis2Experiment(Experiment):
 
 	def __init__(self) -> None:
 		super().__init__("midstep analysis 2")
 
-	def _get_property_embeddings(self, property: str, property_type: str, words_file_id: int, templates_file_id: int, **kwargs) -> Dataset:
+	def _get_property_embeddings(self, property: str, property_type: str, words_file_id: int, templates_file_id: int, configs: Configurations) -> Dataset:
 		"""
 		Returns the embeddings for the given property.
 
@@ -68,12 +71,12 @@ class MidstepAnalysis2Experiment(Experiment):
 			raise ValueError(f'Invalid property type: {property_type}. Must be "protected" or "stereotyped".')
 		words_file = f'data/{property_type}-p/{property}/words-{words_file_id:02d}.csv'
 		templates_file = f'data/{property_type}-p/{property}/templates-{templates_file_id:02d}.csv'
-		embeddings = get_cached_embeddings(property_name=property, property_pattern=pattern, words_file=words_file, templates_file=templates_file, rebuild=REBUILD, **kwargs)
+		embeddings = get_cached_embeddings(property_name=property, property_pattern=pattern, words_file=words_file, templates_file=templates_file, configs=configs, rebuild=REBUILD)
 		squeezed_embs = embeddings['embedding'].squeeze().tolist()
 		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('pytorch')
 		return embeddings
 
-	def _get_embeddings(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, num_templates: int | str) -> tuple[Dataset, Dataset]:
+	def _get_embeddings(self, protected_property: str, stereotyped_property: str, configs: Configurations) -> tuple[Dataset, Dataset]:
 		"""
 		Returns the embeddings for the protected and stereotyped property.
 
@@ -83,17 +86,22 @@ class MidstepAnalysis2Experiment(Experiment):
 		:param num_templates: The number of templates to consider in the embeddings.
 		:return: A tuple containing the embeddings for the protected and stereotyped property.
 		"""
-		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, 
-			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word')
-		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, 
-			max_tokens_number=num_max_tokens, 
-			templates_selected_number=num_templates).sort('word')
+		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, configs).sort('word')
+		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, configs).sort('word')
 		if 'descriptor' in stereotyped_embedding_dataset.column_names:
 			stereotyped_embedding_dataset = stereotyped_embedding_dataset.filter(lambda x: x['descriptor'] != 'unused')
+		
+		# DEBUG
+		print("Protected embeddings length:", len(protected_embedding_dataset))
+		# for row in protected_embedding_dataset:
+		#	print(f"{row['word']:20s} {row['value']:10s} {row['descriptor']:10s} => {row['embedding'].shape}")
+		print("Stereotyped embeddings length:", len(stereotyped_embedding_dataset))
+		for row in stereotyped_embedding_dataset:
+			print(f"{row['word']:20s} {row['value']:10s} {row['descriptor']:10s} => {row['embedding'].shape}")
+
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
-	def _get_polarization_scores(self, protected_property: str, stereotyped_property: str, num_max_tokens: int | str, cross_score_type: str, polarization_strategy: str) -> Dataset:
+	def _get_polarization_scores(self, protected_property: str, stereotyped_property: str, configs: Configurations) -> Dataset:
 		"""
 		Returns the polarization cross-scores for the protected and stereotyped properties.
 		The cross scores are computed accordijng to the given parameters.
@@ -107,10 +115,15 @@ class MidstepAnalysis2Experiment(Experiment):
 			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
 			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
-		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, rebuild=REBUILD,
-			max_tokens_number=num_max_tokens, cross_score=cross_score_type, polarization_strategy=polarization_strategy)
+		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, configs=configs, rebuild=REBUILD)
+		# # DEBUG
+		# print("Protected entries length:", len(pp_entries))
+		# print(pp_entries)
+		# print("Stereotyped entries length:", len(sp_entries))
+		# print(sp_entries)
+		# print("Polarization scores length:", len(polarization_scores))
+		# print(polarization_scores.data)
 
-		# TODO: Control if we want values or words
 		if not PolarizationScorer.STEREOTYPED_ENTRIES_COLUMN in polarization_scores.column_names:
 			raise ValueError(f'Expected the column "stereotyped_value" in the cross-scores dataset, but it was not found.')
 		return polarization_scores.rename_column(PolarizationScorer.STEREOTYPED_ENTRIES_COLUMN, 'word').sort('word')
@@ -131,46 +144,45 @@ class MidstepAnalysis2Experiment(Experiment):
 		# Using the reducer to reduce the stereotyped embeddings
 		return reducer.reduce(stere_emb['embedding'])
 
-	def _compute_correlation(self, reduced_embeddings: torch.Tensor, mlm_scores: torch.Tensor) -> torch.Tensor:
+	def _compute_correlation(self, reduced_embeddings: torch.Tensor, polarization_scores: torch.Tensor) -> torch.Tensor:
 		"""
 		Computes the correlation (a similarity measure) between the reduced embeddings and the MLM scores.
 		The result is a tensor where each element is the correlation between the MLM scores and a coordinate of the reduced embeddings.
 
 		:param reduced_embeddings: The reduced embeddings
-		:param mlm_scores: The MLM scores
+		:param polarization_scores: The MLM scores
 		:return: A tensor where each element is the correlation between the MLM scores and a coordinate of the reduced embeddings. 
 		E.g. if the embeddings are reduced to 2 dimensions, the result will be a tensor of size 2.
 		"""
-		assert reduced_embeddings.shape[0] == mlm_scores.shape[0], f"Expected the same number of embeddings and scores, but got {reduced_embeddings.shape[0]} and {mlm_scores.shape[0]}."
+		assert reduced_embeddings.shape[0] == polarization_scores.shape[0], f"Expected the same number of embeddings and scores, but got {reduced_embeddings.shape[0]} and {polarization_scores.shape[0]}."
+		#print("CORRELATION COMPUTING")
+		#print("Embeddings shape:", reduced_embeddings.shape)
+		#print("Scores shape:", polarization_scores.shape)
 		# Computation
 		coefs = []
-		mlm_scores = mlm_scores.to(DEVICE)
+		polarization_scores = polarization_scores.to(DEVICE)
 		pearson = PearsonCorrCoef().to(DEVICE)
 		for polar_i in range(reduced_embeddings.shape[1]):
 			emb_coord = reduced_embeddings.moveaxis(0, 1)[polar_i].to(DEVICE)
-			corr = pearson(emb_coord, mlm_scores)
+			corr = pearson(emb_coord, polarization_scores)
 			coefs.append(corr.item())
 		return torch.Tensor(coefs).to(DEVICE)
 
 	def _execute(self, **kwargs) -> None:
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768+1))})
 
-		for ntok, ntem in product(NUM_MAX_TOKENS, NUM_TEMPLATES):
-			print(f"Parameters:\n",
-				f"\t- Number of maximum tokens: {ntok}\n",
-				f"\t- Number of templates: {ntem}\n",
-				f"\t- Classifier: {CLASSIFIER_TYPE}\n",
-				f"\t- Cross scoring: {CROSS_SCORE}\n",
-				f"\t- Polarization strategy: {POLARIZATION}\n")
+		for configs in configurations:
+			# Showing the current configuration
+			print("Current parameters configuration:\n", configs, '\n')
 			
 			# Getting the embeddings
-			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, ntok, ntem)
+			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, configs)
 			# Getting the MLM scores
-			cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, ntok, CROSS_SCORE, POLARIZATION)
+			cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, configs)
 			self._check_correspondence(stere_emb, cross_scores)
 
 			# Creating and training the classifier
-			classifier: AbstractClassifier = MidstepAnalysisExperiment._get_classifier(CLASSIFIER_TYPE)
+			classifier: AbstractClassifier = ClassifierFactory.create(configs)
 			classifier.train(prot_emb)
 
 			# For each polarization column, we compute the correlations
@@ -204,11 +216,73 @@ class MidstepAnalysis2Experiment(Experiment):
 
 				for dim in range(correlations.shape[0]):
 					# Add the correlation values to the results dataset
-					results = results.add_column(f"TK{ntok}_TM{ntem}_{pol_name}_DIM{dim}", correlations[dim].tolist())
+					column_name: str = f"{configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER)}_{pol_name}_DIM{dim}"
+					results = results.add_column(column_name, correlations[dim].tolist())
 
 		# Save the results
 		folder = f"results/{protected_property}-{stereotyped_property}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		filename = f"aggregated_midstep_correlation_CL{CLASSIFIER_TYPE}_CR{CROSS_SCORE}_POL{POLARIZATION}.csv"
+		filename = f"aggregated_midstep_correlation_{configs.to_abbrstr(Parameter.CLASSIFIER_TYPE, Parameter.CROSSING_STRATEGY, Parameter.POLARIZATION_STRATEGY)}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)
+
+		###################################################################
+		# Drawing
+
+		# We take a specific configuration to draw the graphs
+		draw_configs = Configurations({
+			Parameter.MAX_TOKENS_NUMBER: 1, 
+			Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+			Parameter.CLASSIFIER_TYPE: configs.get(Parameter.CLASSIFIER_TYPE),
+			Parameter.CROSSING_STRATEGY: configs.get(Parameter.CROSSING_STRATEGY),
+			Parameter.POLARIZATION_STRATEGY: configs.get(Parameter.POLARIZATION_STRATEGY)
+			})
+
+		corr_max = 0
+		col_max = ""
+		pol_axis_max = ""
+		n_max = 0
+		for col in results.column_names:
+			if col.startswith("n"):
+				continue
+			if not col.startswith(configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER)):
+				continue
+			# Getting the max correlation for each dimension
+			column_correlations = torch.Tensor([abs(x) for x in results[col]])
+			# Getting the index of the max correlation
+			n = column_correlations.argmax().item()
+			if column_correlations[n] > corr_max:
+				corr_max = column_correlations[n]
+				pol_axis_max = col.split("_")[-3:-1]
+				n_max = n
+		
+		# Print data
+		print(f"Max correlation: {corr_max}")
+		print(f"Found in column: {col_max}, with midstep n = {n_max}")
+
+		# Now we have the column with the max correlation
+		prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, draw_configs)
+		cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, draw_configs)
+		polar = cross_scores[f"polarization_{pol_axis_max[0]}_{pol_axis_max[1]}"].tolist()
+
+		# Creating and training the classifier
+		classifier: AbstractClassifier = ClassifierFactory.create(draw_configs)
+		classifier.train(prot_emb)
+		reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n_max, classifier)
+		first_coord = reduced_embeddings[:, 0].tolist()
+		second_coord = reduced_embeddings[:, 1].tolist()
+
+		plot_results = Dataset.from_dict({
+			"word": stere_emb['word'],
+			"value": stere_emb['value'],
+			"x": first_coord, 
+			"y": second_coord,
+			"polarization": polar
+			})
+	
+		# Print the reduced embeddings to CSV file
+		config_str = draw_configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER, Parameter.CLASSIFIER_TYPE, Parameter.CROSSING_STRATEGY, Parameter.POLARIZATION_STRATEGY)
+		filename = f"reduced_embeddings_{config_str}_n{n_max}.csv"
+		plot_results.to_csv(f"{folder}/{filename}", index=False)
+
+

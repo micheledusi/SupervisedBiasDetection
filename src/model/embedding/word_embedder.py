@@ -19,11 +19,11 @@ from transformers import AutoModel, AutoTokenizer, logging
 
 import sys
 from pathlib import Path
-
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
-from utils.const import BATCH_SIZE, DEFAULT_BERT_MODEL_NAME, NUM_PROC, DEVICE
+from utils.config import Configurations, Parameter
+from utils.const import *
 
 # Disabling transformers logging
 logging.set_verbosity_error()
@@ -33,13 +33,10 @@ class WordEmbedder:
 	This class offers the ability to extract embeddings from a word, through the model BERT.
 	In order to extract an embedding, the user must call the "embed" method.
 	"""
-	def __init__(self, **kwargs) -> None:
+	def __init__(self, configs: Configurations, pattern: re.Pattern[str] | str = SP_PATTERN) -> None:
 		"""
 		This method initializes the class.
 		Possible keyword arguments are:
-
-			- ``pattern``: the pattern used to find the word in the sentence. 
-			By default, it will use the "Stereotype Property" pattern from 'sentence_maker.py'.
 
 			- ``templates_selected_number``: the number of templates to select for each word. 
 			If the value is "-1", all the templates will be selected. The selection is done randomly. 
@@ -60,39 +57,31 @@ class WordEmbedder:
 
 		This parameters are used in the "embed" method.
 
-		:param kwargs: The keyword arguments to be passed to the embedding method.
+		:param configs: The configurations of the project.
+		:param pattern: The pattern used to find the word in the sentence. By default, it will use the "Stereotype Property" pattern from 'sentence_maker.py'.
 		"""
 		# Processing arguments
 		# The pattern used to find the word in the sentence.
-		if 'pattern' in kwargs:
-			self.pattern: re.Pattern[str] = re.compile(kwargs['pattern'])
+		if isinstance(pattern, str):
+			self.pattern: re.Pattern[str] = re.compile(pattern)
 		else:
-			self.pattern: re.Pattern[str] = SP_PATTERN
+			self.pattern: re.Pattern[str] = pattern
 
 		# The number of templates to select for each word.
 		# If the value is "-1", all the templates will be selected.
 		# The selection is done randomly.
-		if 'templates_selected_number' in kwargs:
-			arg = kwargs['templates_selected_number']
-			if arg == 'all':
-				self.templates_selected_number: int = -1 # "-1" means all templates will be selected
-			else:
-				self.templates_selected_number: int = max(1, arg)	# At least one template will be selected
+		arg_tmpl = configs.get(Parameter.TEMPLATES_SELECTED_NUMBER, DEFAULT_TEMPLATES_SELECTED_NUMBER)
+		if arg_tmpl == 'all' or arg_tmpl == -1:
+			self.templates_selected_number: int = -1 # "-1" means all templates will be selected
 		else:
-			self.templates_selected_number: int = -1
+			self.templates_selected_number: int = max(1, arg_tmpl)	# At least one template will be selected
 		
 		# Whether to average the embeddings of each template or not, for a single word
-		if 'average_templates' in kwargs:
-			self.average_templates = kwargs['average_templates']
-		else:
-			self.average_templates = True
+		self.average_templates = configs.get(Parameter.AVERAGE_TEMPLATES, DEFAULT_AVERAGE_TEMPLATES)
 
 		# Whether to average the embeddings of each token or not, for a single word
 		# Note: we don't know in advance if the word will be split into multiple tokens
-		if 'average_tokens' in kwargs:
-			self.average_tokens = kwargs['average_tokens']
-		else:
-			self.average_tokens = True
+		self.average_tokens = configs.get(Parameter.AVERAGE_TOKENS, DEFAULT_AVERAGE_TOKENS)
 		
 		# The maximum number of tokens to consider for each word
 		# If the value is "-1", all the tokens will be considered
@@ -101,20 +90,14 @@ class WordEmbedder:
 		#	- if the number of tokens is greater than the maximum number of tokens:
 		#		- if the value of "discard_longer_words" is True, the word will be discarded
 		#		- if the value of "discard_longer_words" is False, the considered tokens will be the first "max_tokens_number" tokens
-		if 'max_tokens_number' in kwargs:
-			arg = kwargs['max_tokens_number']
-			if arg == 'all':
-				self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
-			else:
-				self.max_tokens_number: int = max(1, arg)	# At least one token has to be considered
-		else:
+		arg_tkns = configs.get(Parameter.MAX_TOKENS_NUMBER, DEFAULT_MAX_TOKENS_NUMBER)
+		if arg_tkns == 'all' or arg_tkns == -1:
 			self.max_tokens_number: int = -1
+		else:
+			self.max_tokens_number: int = max(1, arg_tkns)
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		if 'discard_longer_words' in kwargs:
-			self.discard_longer_words = kwargs['discard_longer_words']
-		else:
-			self.discard_longer_words = False
+		self.discard_longer_words = configs.get(Parameter.DISCARD_LONGER_WORDS, DEFAULT_DISCARD_LONGER_WORDS)
 
 		# The model used to extract the embeddings
 		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)

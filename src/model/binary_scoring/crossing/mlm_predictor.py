@@ -9,15 +9,16 @@ from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import torch
+
 import sys
 from pathlib import Path
-
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from utils.const import *
 from data_processing.sentence_maker import replace_stereotyped_word, mask_protected_word
 from data_processing.sentence_maker import get_generation_datasets
 from model.embedding.word_embedder import WordEmbedder
+from utils.config import Configurations, Parameter
 
 
 class MLMPredictor:
@@ -27,27 +28,19 @@ class MLMPredictor:
 
 	__softmax = torch.nn.Softmax(dim=-1)
 
-	def __init__(self, **kwargs) -> None:
+	def __init__(self, configs: Configurations) -> None:
 		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		if torch.cuda.is_available():
-			self.model.cuda()
+		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
 		
 		# The maximum number of tokens to consider/retain for the word
-		if 'max_tokens_number' in kwargs:
-			arg = kwargs['max_tokens_number']
-			if arg == 'all':
-				self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
-			else:
-				self.max_tokens_number: int = max(1, arg)	# At least one token has to be considered
+		arg_tkns = configs.get(Parameter.MAX_TOKENS_NUMBER, DEFAULT_MAX_TOKENS_NUMBER)
+		if arg_tkns == 'all' or arg_tkns == -1:
+			self.max_tokens_number: int = -1
 		else:
-			self.max_tokens_number: int = DEFAULT_MAX_TOKENS_NUMBER
+			self.max_tokens_number: int = max(1, arg_tkns)
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		if 'discard_longer_words' in kwargs:
-			self.discard_longer_words = kwargs['discard_longer_words']
-		else:
-			self.discard_longer_words = DEFAULT_DISCARD_LONGER_WORDS
+		self.discard_longer_words: bool = configs.get(Parameter.DISCARD_LONGER_WORDS, DEFAULT_DISCARD_LONGER_WORDS)
 
 	def predict(self, sentences: str | list[str], target: str) -> torch.Tensor:
 		"""

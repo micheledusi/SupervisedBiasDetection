@@ -5,27 +5,28 @@
 #   Date:    2023               #
 # - - - - - - - - - - - - - - - #
 
-# This module contains the methods used to generate the "cross-scores".
-# The cross-scores are scores computed on pairs of words. 
-# In particular, each cross-score involves a word from the stereotyped property 
-# and a word from the protected property.
+# This module contains the methods used to generate the "crossing" scores.
+# These are values computed on pairs of words, according to the procedure we named "crossing".
+# In particular, each score involves:
+# - a word from the stereotyped property,
+# - and a word from the protected property.
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from datasets import Dataset
 import torch
 from tqdm import tqdm
 
 from data_processing.sentence_maker import replace_protected_word, replace_stereotyped_word
 from model.embedding.word_embedder import WordEmbedder
-from utils.const import DEFAULT_DISCARD_LONGER_WORDS, DEFAULT_MAX_TOKENS_NUMBER, DEVICE
+from utils.config import Configurations, Parameter
 
 
-class CrossScorer:
+class CrossingScorer(ABC):
 
-	def __init__(self, **kwargs) -> None:
+	def __init__(self, configs: Configurations) -> None:
 		"""
-		Initializes the CrossScorer object.
-		In the initialization, the following parameters can be specified:
+		Initializes the CrossingScorer object.
+		In the initialization, the following parameters must be specified in the "configs" object:
 		- max_tokens_number: the maximum number of tokens to consider/retain for the word.
 		- discard_longer_words: whether to discard the words that are split into more tokens than the maximum number of tokens.
 
@@ -38,27 +39,21 @@ class CrossScorer:
 		:param kwargs: The arguments for the initialization.
 		"""
 		# The maximum number of tokens to consider/retain for the word
-		if 'max_tokens_number' in kwargs:
-			arg = kwargs['max_tokens_number']
-			if arg == 'all':
-				self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
-			else:
-				self.max_tokens_number: int = max(1, arg)	# At least one token has to be considered
-		else:
-			self.max_tokens_number: int = DEFAULT_MAX_TOKENS_NUMBER
+		self.max_tokens_number: int = configs[Parameter.MAX_TOKENS_NUMBER]
+		if self.max_tokens_number == 'all' or self.max_tokens_number == -1:
+			self.max_tokens_number: int = -1 # "-1" means all tokens will be considered
+		elif self.max_tokens_number < 1:
+			self.max_tokens_number: int = 1	# At least one token has to be considered
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		if 'discard_longer_words' in kwargs:
-			self.discard_longer_words = kwargs['discard_longer_words']
-		else:
-			self.discard_longer_words = DEFAULT_DISCARD_LONGER_WORDS
+		self.discard_longer_words = configs.get[Parameter.DISCARD_LONGER_WORDS]
 		
 		# Initializing the embedder and the tokenizer
-		self.embedder = WordEmbedder()
+		self.embedder = WordEmbedder(configs)
 
-	def compute_cross_scores(self, templates: Dataset, protected_words: Dataset, stereotyped_words: Dataset) -> tuple[Dataset, Dataset, torch.Tensor]:
+	def compute(self, templates: Dataset, protected_words: Dataset, stereotyped_words: Dataset) -> tuple[Dataset, Dataset, torch.Tensor]:
 		"""
-		This method computes the cross-scores for each pair of words.
+		This method computes the crossing-scores for each pair of words.
 		The cross-scores are computed for each pair of words in the protected_words and stereotyped_words datasets.
 
 		:param templates: The templates dataset.
@@ -117,13 +112,13 @@ class CrossScorer:
 				sw_tokens = sw['tokens']
 				
 				# Computing the cross-score
-				score = self._compute_cross_score(sentences_tokens, pw_tokens, sw_tokens)
+				score = self._compute_crossing_score(sentences_tokens, pw_tokens, sw_tokens)
 				words_scores[j, i] = score
 		
 		return protected_words, stereotyped_words, words_scores
 	
 	@abstractmethod
-	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
+	def _compute_crossing_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
 		"""
 		This method computes the cross-score for a pair of words, in a series of sentences.
 
@@ -133,44 +128,4 @@ class CrossScorer:
 		:return: The cross-score, as a float.
 		"""
 		raise NotImplementedError("This method must be implemented by the subclasses.")
-	
-	@staticmethod
-	def average_by_values(words: Dataset, words_scores: torch.Tensor, dim: int = 0) -> tuple[tuple[str], torch.Tensor]:
-		"""
-		This method computes the average of the cross-scores for each pair of words, 
-		grouped by the values of the words along a given dimension.
-
-		It's useful to compute the average cross-scores for each protected value, instead of considering all the protected words indipendently.
-		It can also be used for the stereotyped values.
-
-		:param words: The words dataset, associated with values to be used for grouping.
-		:param words_scores: The cross-scores tensor, to be grouped by values along a given dimension.
-		:param dim: The dimension along which the values are grouped.
-		:return: A tuple containing:
-		- The sorted values (as a tuple).
-		- The average scores tensor, with size (#protected_values, #stereotyped_values).
-		"""
-		# Extracting the values from the dataset
-		values = tuple(set(words['value']))
-
-		# Preparing the tensor with the same size of the cross-scores tensor, except for the dimension along which the values are grouped
-		size = list(words_scores.shape)
-		assert dim < len(size), "The dimension along which the values are grouped must be less than the number of dimensions of the cross-scores tensor."
-		assert size[dim] == len(words), "The number of words must be equal to the size of the dimension along which the values are grouped."
-		# Setting the size of the dimension along which the values are grouped to the number of values
-		size[dim] = len(values)
-		average_scores = torch.zeros(size=size).to(DEVICE)
-
-		# Moving the dimension along which the values are grouped to the first dimension, for the resulting tensor
-		average_scores = average_scores.swapaxes(dim, 0)
-
-		for val_index, val in enumerate(values):
-			# Computing the average of the cross-scores for each pair of words, grouped by the values of the words along a given dimension
-			# For each protected value, we compute the average of the cross-scores for each stereotyped value
-			pw_indices = [i for i, x in enumerate(words['value']) if x == val]
-			selected_scores = words_scores.index_select(dim=0, index=torch.tensor(pw_indices).to(DEVICE))
-			average_scores[val_index] = torch.mean(selected_scores, dim=0)
-	
-		average_scores = average_scores.swapaxes(0, dim)
-		return values, average_scores
 

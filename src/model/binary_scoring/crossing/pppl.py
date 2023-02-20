@@ -7,15 +7,17 @@
 
 import torch
 from transformers import AutoModelForMaskedLM
+from model.binary_scoring.crossing.base import CrossingScorer
 
-from model.cross_scoring.base import CrossScorer
+
+from utils.config import Configurations
 from utils.const import DEFAULT_BERT_MODEL_NAME, DEVICE
 
 
 IGNORE_INDEX: int = -100
 
 
-class PPPLCrossScorer(CrossScorer):
+class PPPLCrossScorer(CrossingScorer):
 	"""
 	This class implements the CrossScorer interface for Masked Language Models.
 	It measures the Pseudo-Perplexity (PPPL) score for sentences where a pair of word (protected and stereotyped) is involved.
@@ -34,8 +36,8 @@ class PPPLCrossScorer(CrossScorer):
 
 	"""
 
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
+	def __init__(self, configs: Configurations):
+		super().__init__(configs)
 		# Getting the model
 		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
 		self.model.to(DEVICE)
@@ -82,7 +84,7 @@ class PPPLCrossScorer(CrossScorer):
 		score: float = torch.exp(loss).item()
 		return score
 
-	def _compute_cross_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
+	def _compute_crossing_score(self, sentences_tokens: torch.Tensor, pw_tokens: torch.Tensor | list[int], sw_tokens: torch.Tensor | list[int]) -> float:
 		# The score is the average of the PPPL of each sentence.
 		scores_sum: float = 0
 		for sentence in sentences_tokens:
