@@ -12,6 +12,8 @@ from model.binary_scoring.crossing.base import CrossingScorer
 from utils.config import Configurations
 from utils.const import DEFAULT_BERT_MODEL_NAME, DEVICE
 
+VERBOSE: bool = False
+
 
 class MLMCrossScorer(CrossingScorer):
 	"""
@@ -66,9 +68,10 @@ class MLMCrossScorer(CrossingScorer):
 		if isinstance(pw_tokens, list):
 			pw_tokens = torch.Tensor(pw_tokens)
 		pw_tokens = pw_tokens.long()
-		
-		if pw_tokens.shape[0] > 1:
-			print("WARNING: pw_tokens has more than one token. The method is not tested for this case.")
+
+		if VERBOSE:
+			print("\n\n\nSentences tokens shape:", sentences_tokens.shape)
+			print("PW tokens shape:", pw_tokens.shape)
 
 		# We replace the pw with the mask token
 		mask_token_index = []
@@ -76,21 +79,63 @@ class MLMCrossScorer(CrossingScorer):
 			pw_indices = self._get_subsequence_index(sent_tokens, pw_tokens)
 			sent_tokens[pw_indices] = self.embedder.tokenizer.mask_token_id
 			mask_token_index.append(pw_indices)
-		mask_token_index = torch.stack(mask_token_index).squeeze()
-
-		with torch.no_grad():
-			scores = self.model(input_ids=sentences_tokens, labels=sentences_tokens).logits
-			# The resulting scores shape is [#sentences, #tokens, #vocab]
+			if VERBOSE:
+				print("Sentence: ", sent_tokens)
+				print("Protected word tokens:", pw_tokens)
+				print("Protected word indices:", pw_indices)
+				print("Sentence with mask:", sent_tokens)
 		
-		word_scores = scores[:, mask_token_index, :]
-		word_scores = word_scores.diagonal(dim1=0, dim2=1).moveaxis(-1, 0)
-		# Pairing the two first dimensions, so that we have a tensor of shape (vocabulary_size, batch_size)
-		# Then, moving the batch_size dimension to the first position, so that we have a tensor of shape (batch_size, vocabulary_size)
+		mask_token_index = torch.stack(mask_token_index)
+		if VERBOSE:
+			print("Mask token index shape:", mask_token_index.shape)
+			print("Mask token index:", mask_token_index)
+			print("Resulting sentences:", sentences_tokens)
+		# Shape = [#sentences, #pw_tokens]
+		
+		
+		# Computing the scores for the sentences
+		with torch.no_grad():
+			scores: torch.Tensor = self.model(input_ids=sentences_tokens, labels=sentences_tokens).logits
+			if VERBOSE:
+				print("Scores shape:", scores.shape)
+			# The resulting scores shape is [#sentences, #all_tokens, #vocab]
 
-		# Getting the probability of the pw, applying softmax over the vocabulary dimension
-		word_probs = self.__softmax(word_scores)
-		word_probs = word_probs[:, pw_tokens]
+			# We define the new shape as [#sentences, #pw_tokens, #vocab]
+			word_scores_shape = (scores.shape[0], pw_tokens.shape[0], scores.shape[-1])
+			# Then, we get the scores for the pw tokens for each sentence
+			word_scores = torch.zeros(word_scores_shape, dtype=torch.float32)
+			for sent_index in range(scores.shape[0]):
+				word_scores[sent_index] = scores[sent_index, mask_token_index[sent_index]]
+			
+			if VERBOSE:
+				print("Word scores shape:", word_scores.shape)
+			# The shape is now [#sentences, #pw_tokens, #vocab]
 
-		# Averaging the probabilities over the batch dimension
-		avg_probs = word_probs.mean(dim=0)
-		return avg_probs
+			# Now we compute the probabilities for each tokens of the pw for each sentence
+			word_probs = self.__softmax(word_scores)
+			if VERBOSE:
+				print("Word probs shape:", word_probs.shape)
+			# The shape is still [#sentences, #pw_tokens, #vocab]
+
+			# On the vocabulary dimension, we keep only the probabilities for the pw tokens
+			word_probs = word_probs[:, :, pw_tokens]
+			if VERBOSE:
+				print("Word probs shape:", word_probs.shape)
+			# The shape is now [#sentences, #pw_tokens, #pw_tokens]
+			# The last two dimensions mean: what is the probability of the X token to be in the spot of the Y token?
+			# For this, we keep only the diagonal of the matrix, where X = Y
+			word_probs = word_probs.diagonal(dim1=-2, dim2=-1)
+			if VERBOSE:
+				print("Word probs shape:", word_probs.shape)
+			# The shape is now [#sentences, #pw_tokens]
+
+			# Now we can choose to manage the resulting values in different ways:
+			# - We can average the probabilities over the batch dimension	
+			# - We can average the probabilities over the pw tokens dimension
+			# - We can do both.
+			# We choose to consider the final MLM score to be the average of the probabilities for EACH token of the protected word, for EACH sentence.
+			avg_probs = word_probs.mean()
+			if VERBOSE:
+				print("Avg probs:", avg_probs)
+			return avg_probs
+
