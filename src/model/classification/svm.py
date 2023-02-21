@@ -43,14 +43,14 @@ class SVMClassifier(AbstractClassifier):
 	"""
 	def __init__(self) -> None:
 		super().__init__()
-		self._model = LinearSVC(penalty="l2", loss="squared_hinge", dual=True)
+		self._model = LinearSVC(penalty="l2", loss="squared_hinge", dual=False)
 
 	@property
 	def features_relevance(self) -> torch.Tensor:
 		return torch.Tensor(self._model.coef_).squeeze().abs()
 
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
-		self._model.fit(x, y)
+		self._model.fit(x, y.ravel())
 
 	def _predict(self, x: torch.Tensor) -> torch.Tensor:
 		return torch.Tensor(self._model.predict(x))
