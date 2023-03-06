@@ -19,7 +19,7 @@ directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
 from model.classification.svm import SVMClassifier
-from utils.caching.binary import get_cached_embeddings
+from utils.caching.creation import get_cached_embeddings
 
 
 if __name__ == '__main__':

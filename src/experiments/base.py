@@ -13,7 +13,7 @@ import time
 from datasets import Dataset
 
 from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
-from utils.caching.binary import get_cached_embeddings, get_cached_cross_scores
+from utils.caching.creation import get_cached_embeddings, get_cached_crossing_scores
 from utils.const import NUM_PROC
 
 
@@ -65,7 +65,7 @@ class Experiment:
 	@staticmethod
 	def _get_default_mlm_scores(protected_property: str, stereotyped_property: str) -> Dataset:
 		generation_id: int = 1
-		return get_cached_cross_scores(protected_property, stereotyped_property, generation_id)
+		return get_cached_crossing_scores(protected_property, stereotyped_property, generation_id)
 
 	@abstractmethod
 	def _execute(self, **kwargs) -> None:

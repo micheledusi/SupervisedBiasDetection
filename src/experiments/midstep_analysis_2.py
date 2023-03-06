@@ -25,21 +25,21 @@ from model.classification.factory import ClassifierFactory
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.caching.binary import get_cached_embeddings, get_cached_polarization_scores
+from utils.caching.creation import get_cached_embeddings, get_cached_polarization_scores
 from utils.config import Configurations, ConfigurationsGrid, Parameter
 from utils.const import DEVICE
 
 
 # Configurations to process data
 configurations = ConfigurationsGrid({
-	Parameter.MAX_TOKENS_NUMBER: [1, 2, 3, 4, 'all'],
+	Parameter.MAX_TOKENS_NUMBER: ['all'],
 	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
 	Parameter.CLASSIFIER_TYPE: 'svm',
 	Parameter.CROSSING_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: 'ratio'
 })
 
-protected_property = 'religion'
+protected_property = 'ethnicity'
 stereotyped_property = 'criminality'
 
 PROTECTED_WORDS_FILE_ID = 1
@@ -96,8 +96,9 @@ class MidstepAnalysis2Experiment(Experiment):
 		# for row in protected_embedding_dataset:
 		#	print(f"{row['word']:20s} {row['value']:10s} {row['descriptor']:10s} => {row['embedding'].shape}")
 		print("Stereotyped embeddings length:", len(stereotyped_embedding_dataset))
-		for row in stereotyped_embedding_dataset:
-			print(f"{row['word']:20s} {row['value']:10s} {row['descriptor']:10s} => {row['embedding'].shape}")
+		# for row in stereotyped_embedding_dataset:
+		# 	desc = row.get('descriptor', "")
+		# 	print(f"{row['word']:20s} {row['value']:20s} {desc:10s} => {row['embedding'].shape}")
 
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
@@ -239,7 +240,6 @@ class MidstepAnalysis2Experiment(Experiment):
 			})
 
 		corr_max = 0
-		col_max = ""
 		pol_axis_max = ""
 		n_max = 0
 		for col in results.column_names:
@@ -255,29 +255,56 @@ class MidstepAnalysis2Experiment(Experiment):
 				corr_max = column_correlations[n]
 				pol_axis_max = col.split("_")[-3:-1]
 				n_max = n
+		first_prot_value, second_prot_value = pol_axis_max
 		
 		# Print data
 		print(f"Max correlation: {corr_max}")
-		print(f"Found in column: {col_max}, with midstep n = {n_max}")
+		print(f"Found in column: {pol_axis_max}, with midstep n = {n_max}")
 
 		# Now we have the column with the max correlation
 		prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, draw_configs)
 		cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, draw_configs)
-		polar = cross_scores[f"polarization_{pol_axis_max[0]}_{pol_axis_max[1]}"].tolist()
+		# Extracting the polarization scores for the Stereotyped words
+		sp_polar = cross_scores[f"polarization_{first_prot_value}_{second_prot_value}"].tolist()
+		first_prot_value_polar = min(sp_polar)
+		second_prot_value_polar = max(sp_polar)
+
+		pp_polar = list(map(lambda val: 
+		 	first_prot_value_polar if val == first_prot_value 
+		 	else second_prot_value_polar if val == second_prot_value
+			else None,  
+			prot_emb['value']))
+		
+		polarizations = sp_polar + pp_polar
+		types = ['stereotyped'] * len(sp_polar) + ['protected'] * len(pp_polar)
+		words = stere_emb['word'] + prot_emb['word']
+		values = stere_emb['value'] + prot_emb['value']
 
 		# Creating and training the classifier
 		classifier: AbstractClassifier = ClassifierFactory.create(draw_configs)
 		classifier.train(prot_emb)
-		reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n_max, classifier)
+		
+		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=n_max)
+		prot_input: torch.Tensor = prot_emb['embedding'].to(DEVICE)
+		reduced_protected_embeddings = reducer_1.reduce(prot_input).to(DEVICE)
+		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
+		reducer = CompositeReducer([reducer_1, reducer_2])
+
+		# Using the reducer to reduce BOTH protected and stereotyped embeddings
+		all_embeddings = torch.cat((stere_emb['embedding'], prot_emb['embedding']))
+		reduced_embeddings = reducer.reduce(all_embeddings).to(DEVICE)
+		print("Reduced embeddings shape:", reduced_embeddings.shape)
+
 		first_coord = reduced_embeddings[:, 0].tolist()
 		second_coord = reduced_embeddings[:, 1].tolist()
 
 		plot_results = Dataset.from_dict({
-			"word": stere_emb['word'],
-			"value": stere_emb['value'],
+			"word": words,
+			"value": values,
+			'property': types,
 			"x": first_coord, 
 			"y": second_coord,
-			"polarization": polar
+			"polarization": polarizations
 			})
 	
 		# Print the reduced embeddings to CSV file
