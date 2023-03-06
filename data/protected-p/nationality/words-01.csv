@@ -1,5 +1,6 @@
-word,value
-british,british
-hispanic,hispanic
-asian,asian
-russian,russian
+word,value,descriptor
+british,british,adj-person
+hispanic,hispanic,adj-person
+asian,asian,adj-person
+chinese,chinese,adj-person
+russian,russian,adj-person
