@@ -1,0 +1,14 @@
+{
+    "protected-words": {
+        "type": "file",
+        "data": "data/protected-p/nationality/words-01.csv"
+    },
+    "stereotyped-words": {
+        "type": "file",
+        "data": "data/stereotyped-p/verb/words-01.csv"
+    },
+    "templates": {
+        "type": "file",
+        "data": "data/crossed-evaluation/nationality-verb/templates-01.csv"
+    }
+}
