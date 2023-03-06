@@ -32,17 +32,17 @@ from utils.const import DEVICE
 
 # Configurations to process data
 configurations = ConfigurationsGrid({
-	Parameter.MAX_TOKENS_NUMBER: ['all'],
-	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
-	Parameter.CLASSIFIER_TYPE: 'svm',
+	Parameter.MAX_TOKENS_NUMBER: 'all',
+	Parameter.TEMPLATES_SELECTED_NUMBER: 6,
+	Parameter.CLASSIFIER_TYPE: 'linear',
 	Parameter.CROSSING_STRATEGY: 'pppl',
-	Parameter.POLARIZATION_STRATEGY: 'ratio'
+	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
 
-protected_property = 'ethnicity'
-stereotyped_property = 'criminality'
+protected_property = 'religion'
+stereotyped_property = 'verb'
 
-PROTECTED_WORDS_FILE_ID = 1
+PROTECTED_WORDS_FILE_ID = 3
 STEREOTYPED_WORDS_FILE_ID = 1
 PROTECTED_TEMPLATES_FILE_ID = 0
 STEREOTYPED_TEMPLATES_FILE_ID = 1
@@ -172,6 +172,7 @@ class MidstepAnalysis2Experiment(Experiment):
 	def _execute(self, **kwargs) -> None:
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768+1))})
 
+		last_configs: Configurations = None
 		for configs in configurations:
 			# Showing the current configuration
 			print("Current parameters configuration:\n", configs, '\n')
@@ -217,35 +218,36 @@ class MidstepAnalysis2Experiment(Experiment):
 
 				for dim in range(correlations.shape[0]):
 					# Add the correlation values to the results dataset
-					column_name: str = f"{configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER)}_{pol_name}_DIM{dim}"
+					# Each column name will contain the MUTABLE parameters in the configuration, i.e.
+					# the parameters that can change from one experiment to another.
+					# The column name will also contain the name of the polarization column. 
+					column_name: str = f"{configs.subget_mutables().to_abbrstr()}_{pol_name}_DIM{dim}"
 					results = results.add_column(column_name, correlations[dim].tolist())
+			
+			last_configs = configs
 
 		# Save the results
 		folder = f"results/{protected_property}-{stereotyped_property}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		filename = f"aggregated_midstep_correlation_{configs.to_abbrstr(Parameter.CLASSIFIER_TYPE, Parameter.CROSSING_STRATEGY, Parameter.POLARIZATION_STRATEGY)}.csv"
+		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
+		# the parameters that cannot change from one experiment to another.
+		filename = f"aggregated_midstep_correlation_{configs.subget_immutables().to_abbrstr()}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)
 
 		###################################################################
 		# Drawing
 
 		# We take a specific configuration to draw the graphs
-		draw_configs = Configurations({
-			Parameter.MAX_TOKENS_NUMBER: 1, 
-			Parameter.TEMPLATES_SELECTED_NUMBER: 3,
-			Parameter.CLASSIFIER_TYPE: configs.get(Parameter.CLASSIFIER_TYPE),
-			Parameter.CROSSING_STRATEGY: configs.get(Parameter.CROSSING_STRATEGY),
-			Parameter.POLARIZATION_STRATEGY: configs.get(Parameter.POLARIZATION_STRATEGY)
-			})
-
+		draw_configs: Configurations = last_configs
 		corr_max = 0
 		pol_axis_max = ""
 		n_max = 0
 		for col in results.column_names:
+			print("Checking column", col)
 			if col.startswith("n"):
 				continue
-			if not col.startswith(configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER)):
+			if not col.startswith(draw_configs.subget_mutables().to_abbrstr()):
 				continue
 			# Getting the max correlation for each dimension
 			column_correlations = torch.Tensor([abs(x) for x in results[col]])
@@ -308,7 +310,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			})
 	
 		# Print the reduced embeddings to CSV file
-		config_str = draw_configs.to_abbrstr(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER, Parameter.CLASSIFIER_TYPE, Parameter.CROSSING_STRATEGY, Parameter.POLARIZATION_STRATEGY)
+		config_str = draw_configs.to_abbrstr()
 		filename = f"reduced_embeddings_{config_str}_n{n_max}.csv"
 		plot_results.to_csv(f"{folder}/{filename}", index=False)
 

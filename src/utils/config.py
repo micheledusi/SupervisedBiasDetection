@@ -64,14 +64,19 @@ class Configurations:
 	value of the parameter is used. This default value comes from the "const" module.
 	"""
     
-	def __init__(self, values: dict[Parameter, Any] = None) -> None:
+	def __init__(self, values: dict[Parameter, Any] = None, mutables: list[Parameter] = []) -> None:
 		"""
 		Initializes the Configurations object.
 		"""
 		if not values:
 			self.__configs: dict[Parameter, Any] = {}
+			if mutables:
+				raise ValueError("The list of mutables must be empty if no values are provided.")
+			else:
+				self.__mutables = mutables.copy()
 		else:
 			self.__configs = values.copy()
+			self.__mutables = mutables.copy()
 
 	def __contains__(self, key: Parameter) -> bool:
 		"""
@@ -110,7 +115,7 @@ class Configurations:
 			raise KeyError(f"The key '{key}' is not contained in the set of configurations.")
 		del self.__configs[key]
 	
-	def set(self, key: Parameter, value: Any) -> None:
+	def set(self, key: Parameter, value: Any, mutable: bool = False) -> None:
 		"""
 		Adds a parameter value to the set of configurations.
 
@@ -118,6 +123,11 @@ class Configurations:
 		:param value: The value of the configuration.
 		"""
 		self.__configs[key] = value
+		if mutable:
+			self.__mutables.append(key)
+		else:
+			if key in self.__mutables:
+				self.__mutables.remove(key)
 	
 	def get(self, key: Parameter, default_value: Any = None) -> Any:
 		"""
@@ -143,6 +153,29 @@ class Configurations:
 		configs = Configurations()
 		for key in keys:
 			configs.set(key, self.get(key))
+		return configs
+	
+	def subget_mutables(self) -> "Configurations":
+		"""
+		Gets another Configurations object with only the mutable parameters.
+
+		:return: The "subset" of the configurations.
+		"""
+		configs = Configurations()
+		for key in self.__mutables:
+			configs.set(key, self.get(key), mutable=True)
+		return configs
+	
+	def subget_immutables(self) -> "Configurations":
+		"""
+		Gets another Configurations object with only the immutable parameters.
+
+		:return: The "subset" of the configurations.
+		"""
+		configs = Configurations()
+		for key in self.__configs:
+			if key not in self.__mutables:
+				configs.set(key, self.get(key))
 		return configs
 	
 	def get_configurations_as_string(self) -> str:
@@ -183,9 +216,11 @@ class Configurations:
 		The parameters are separated by an underscore. The order of the parameters is the same as the order of the keys.
 		Each parameter is represented by its abbreviation followed by its value, with no spaces.
 
-		:param keys: The keys.
+		:param keys: The keys (optional). If not provided, all the parameters are used.
 		:return: The set of configurations as a string.
 		"""
+		if not keys:
+			keys = self.__configs.keys()
 		vals: list[str] = [f"{key.abbr}{self.get(key)}" for key in keys]
 		return "_".join(vals)
 
@@ -202,30 +237,36 @@ class ConfigurationsGrid:
 
 	def __init__(self, values: dict[Parameter, list[Any] | Any]) -> None:
 		self.__values: dict[Parameter, list[Any] | Any] = values
+		self.__num_combinations: int = 0
+		self.__curr_combination_index: int = 1
 		self.__indices: dict[Parameter, int] = {}
 
 	def __iter__(self) -> "ConfigurationsGrid":
+		self.__num_combinations = 1
 		# Reset indices to 0s
+		self.__curr_combination_index = 0
 		for key in self.__values.keys():
 			if isinstance(self.__values[key], list):
 				self.__indices[key] = 0
+				self.__num_combinations *= len(self.__values[key])
 			else:
 				continue
 		return self
 	
 	def __next__(self) -> Configurations:
+		if self.__has_ended():
+			raise StopIteration
 		configs = Configurations()
 		for key in self.__values.keys():
 			if isinstance(self.__values[key], list):
-				configs.set(key, self.__values[key][self.__indices[key]])
+				configs.set(key, self.__values[key][self.__indices[key]], mutable=True)
 			else:
-				configs.set(key, self.__values[key])
+				configs.set(key, self.__values[key], mutable=False)
 		self.__increment_indices()
-		if self.__has_ended():
-			raise StopIteration
 		return configs
 	
 	def __increment_indices(self) -> None:
+		self.__curr_combination_index += 1
 		for key in self.__values.keys():
 			if isinstance(self.__values[key], list):
 				self.__indices[key] += 1
@@ -235,10 +276,4 @@ class ConfigurationsGrid:
 				continue
 	
 	def __has_ended(self) -> bool:
-		for key in self.__values.keys():
-			if isinstance(self.__values[key], list):
-				if self.__indices[key] != 0:
-					return False
-			else:
-				continue
-		return True
+		return self.__curr_combination_index >= self.__num_combinations
