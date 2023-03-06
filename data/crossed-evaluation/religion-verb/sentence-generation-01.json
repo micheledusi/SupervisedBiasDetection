@@ -1,0 +1,14 @@
+{
+    "protected-words": {
+        "type": "file",
+        "data": "data/protected-p/religion/words-03.csv"
+    },
+    "stereotyped-words": {
+        "type": "file",
+        "data": "data/stereotyped-p/verb/words-01.csv"
+    },
+    "templates": {
+        "type": "file",
+        "data": "data/crossed-evaluation/religion-verb/templates-01.csv"
+    }
+}
