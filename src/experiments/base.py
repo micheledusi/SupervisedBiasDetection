@@ -12,13 +12,16 @@ from abc import abstractmethod
 import time
 from datasets import Dataset
 
-from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
-from utils.caching.creation import get_cached_embeddings, get_cached_crossing_scores
-from utils.const import NUM_PROC
+from utils.caching.creation import PropertyDataReference, get_cached_embeddings
+from utils.config import Configurations
+
+REBUILD = False
 
 
 class Experiment:
-
+	"""
+	The base class for the experiments.
+	"""
 	def __init__(self, name: str):
 		"""
 		The initializer for the experiment class.
@@ -46,26 +49,41 @@ class Experiment:
 		print(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
 	
 	@staticmethod
-	def _get_default_embeddings(protected_property: str, stereotyped_property: str, rebuild: bool = False) -> tuple[Dataset, Dataset]:
-		protected_words_file = f'data/protected-p/{protected_property}/words-01.csv'
-		protected_templates_file = f'data/protected-p/{protected_property}/templates-00.csv'
-		protected_embedding_dataset = get_cached_embeddings(protected_property, PP_PATTERN, protected_words_file, protected_templates_file, rebuild=rebuild)
-		stereotyped_words_file = f'data/stereotyped-p/{stereotyped_property}/words-01.csv'
-		stereotyped_templates_file = f'data/stereotyped-p/{stereotyped_property}/templates-01.csv'
-		stereotyped_embedding_dataset = get_cached_embeddings(stereotyped_property, SP_PATTERN, stereotyped_words_file, stereotyped_templates_file, rebuild=rebuild)
+	def _get_property_embeddings(property: PropertyDataReference, configs: Configurations) -> Dataset:
+		"""
+		Returns the embeddings for the given property.
 
-		# Preparing embeddings dataset
-		def squeeze_embedding_fn(sample):
-			sample['embedding'] = sample['embedding'].squeeze()
-			return sample
-		protected_embedding_dataset = protected_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)	# [#words, #templates = 1, #tokens = 1, 768] -> [#words, 768]
-		stereotyped_embedding_dataset = stereotyped_embedding_dataset.map(squeeze_embedding_fn, batched=True, num_proc=NUM_PROC)
-		return protected_embedding_dataset, stereotyped_embedding_dataset
+		:param kwargs: Additional arguments to pass to the embedding function.
+		:return: The embeddings for the given property.
+		"""
+		# Extracting data from property object
+		# 	property: The name of the property.
+		# 	property_type: The type of the property. Must be "protected" or "stereotyped".
+		# 	words_file_id: The id of the words file to use. (e.g. 01, 02, etc.)
+		# 	templates_file_id: The id of the templates file to use. (e.g. 01, 02, etc.)
+
+		# Retrieving embeddings dataset from cache
+		embeddings: Dataset = get_cached_embeddings(property, configs=configs, rebuild=REBUILD)
+		squeezed_embs = embeddings['embedding'].squeeze().tolist()
+		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('torch')
+		return embeddings
 	
 	@staticmethod
-	def _get_default_mlm_scores(protected_property: str, stereotyped_property: str) -> Dataset:
-		generation_id: int = 1
-		return get_cached_crossing_scores(protected_property, stereotyped_property, generation_id)
+	def _get_embeddings(protected_property: PropertyDataReference, stereotyped_property: PropertyDataReference, configs: Configurations) -> tuple[Dataset, Dataset]:
+		"""
+		Returns the embeddings for the protected and stereotyped property.
+
+		:param protected_property: The reference to the protected property data (name, type, words_file_id, templates_file_id).
+		:param stereotyped_property: The reference to the stereotyped property data (name, type, words_file_id, templates_file_id).
+		:param num_max_tokens: The number of maximum tokens to consider in the embeddings.
+		:param num_templates: The number of templates to consider in the embeddings.
+		:return: A tuple containing the embeddings for the protected and stereotyped property.
+		"""
+		protected_embedding_dataset = Experiment._get_property_embeddings(protected_property, configs).sort('word')
+		stereotyped_embedding_dataset = Experiment._get_property_embeddings(stereotyped_property, configs).sort('word')
+		if 'descriptor' in stereotyped_embedding_dataset.column_names:
+			stereotyped_embedding_dataset = stereotyped_embedding_dataset.filter(lambda x: x['descriptor'] != 'unused')
+		return protected_embedding_dataset, stereotyped_embedding_dataset
 
 	@abstractmethod
 	def _execute(self, **kwargs) -> None:

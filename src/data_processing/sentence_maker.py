@@ -8,36 +8,16 @@
 # This module will be used to process the input data for the crossed evalutation.
 # It will generate the sentences based on the templates and the given words.
 
-# Jumping to parent directory with imports
-import sys
-from pathlib import Path
-
-directory = Path(__file__)
-sys.path.append(str(directory.parent.parent))
-
-# Imports
 import json
-from datasets import DownloadMode, load_dataset, Dataset
+from datasets import Dataset
 import re
 from itertools import product
 
+from data_processing.data_reference import BiasDataReference
+from data_processing.pattern import PP_PATTERN, SP_PATTERN
 from utils.const import TOKEN_MASK
 from utils import file_system as fs
 from utils.article_inference import add_article
-
-
-PROTECTED_PROPERTY: str = "religion"
-STEREOTYPED_PROPERTY: str = "quality"
-
-
-PP_PATTERN = r'(\[PROT\-WORD(?:\:([A-Za-z\-]+))?\])'
-PP_PATTERN: re.Pattern[str] = re.compile(PP_PATTERN)
-
-SP_PATTERN = r'(\[STER\-WORD(?:\:([A-Za-z\-]+))?\])'
-SP_PATTERN: re.Pattern[str] = re.compile(SP_PATTERN)
-# These pattern will extract two groups:
-#   - The first group will be the whole "protected word" mask, that is the part that's going to be replaced.
-#   - The second group will be the word descriptor, that is going to be used to select the word.
 
 
 def get_dataset_from_words_csv(words_csv_file: str) -> Dataset:
@@ -92,7 +72,7 @@ def get_dataset_from_templates_json(templates_json: dict) -> Dataset:
     raise ValueError("Invalid type of data for the templates.")
 
 
-def get_generation_datasets(protected_property: str, stereotyped_property: str, file_id: int = 1) -> tuple[Dataset, Dataset, Dataset]:
+def get_generation_datasets(bias_reference: BiasDataReference) -> tuple[Dataset, Dataset, Dataset]:
     """
     This function will return a tuple containing the three datasets:
     - The protected property words dataset.
@@ -101,7 +81,7 @@ def get_generation_datasets(protected_property: str, stereotyped_property: str, 
 
     :return: The tuple containing the three datasets.
     """
-    filepath: str = fs.get_crossed_evaluation_generation_file(protected_property, stereotyped_property, id=file_id)
+    filepath: str = fs.get_crossed_evaluation_generation_file(bias_reference)
     with open(filepath, "r") as file:
         # Obtain the generation-sentence data object
         gen_obj = json.load(file)
@@ -286,21 +266,3 @@ class TemplateCombinator:
 
 def template_combinator(templates_dataset: Dataset, stereotyped_words: Dataset, protected_words: Dataset) -> TemplateCombinator:
     return TemplateCombinator((SP_PATTERN, stereotyped_words), (PP_PATTERN, protected_words), templates_dataset=templates_dataset)
-
-
-if __name__ == "__main__":
-    # Retrieve the datasets
-    pp_words, sp_words, templates = get_generation_datasets(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, 1)
-
-    print("Number of protected words:", len(pp_words))
-    print("Number of stereotyped words:", len(sp_words))
-    print("Number of templates:", len(templates))
-
-    count = 0
-    for _, words, sentence in template_combinator(templates, sp_words, pp_words):
-        count += 1
-        # TODO: Do something with the sentence
-        print(sentence)
-        print(words)
-        if count > 10:
-            break

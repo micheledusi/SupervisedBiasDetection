@@ -19,5 +19,8 @@ torch.manual_seed(42)
 
 if __name__ == "__main__":
 	
-	experiment = MidstepAnalysis2Experiment()
+	# experiment = MidstepAnalysis2Experiment()
+	# experiment.run()
+
+	experiment = DimensionalityReductionExperiment()
 	experiment.run()

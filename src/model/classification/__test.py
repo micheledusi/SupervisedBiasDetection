@@ -17,22 +17,25 @@ from datasets import Dataset
 
 directory = Path(__file__)
 sys.path.append(str(directory.parent.parent.parent))
-from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
+from data_processing.data_reference import PropertyDataReference
+from utils.config import Configurations, Parameter
 from model.classification.svm import SVMClassifier
+from model.classification.linear import LinearClassifier
 from utils.caching.creation import get_cached_embeddings
 
 
 if __name__ == '__main__':
+	
+	configs = Configurations({
+		Parameter.MAX_TOKENS_NUMBER: 'all',
+		Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+		Parameter.CLASSIFIER_TYPE: 'linear',
+		Parameter.CROSSING_STRATEGY: 'pppl',
+		Parameter.POLARIZATION_STRATEGY: 'difference',
+	})
+	property: PropertyDataReference = PropertyDataReference("religion", "protected", 2, 0)
 
-	property = 'religion'
-	property_type = 'protected' # "stereotyped", "protected"
-
-	pattern = SP_PATTERN if property_type == 'stereotyped' else PP_PATTERN if property_type == 'protected' else None
-	words_id = '01'
-	templates_id = '00' if property_type == 'protected' else '01' if property_type == 'stereotyped' else None
-	words_file = f'data/{property_type}-p/{property}/words-{words_id}.csv'
-	templates_file = f'data/{property_type}-p/{property}/templates-{templates_id}.csv'
-	embedding_dataset = get_cached_embeddings(property, pattern, words_file, templates_file, rebuild=False)
+	embedding_dataset = get_cached_embeddings(property, configs, rebuild=False)
 
 	def print_dataset_info(dataset: Dataset):
 		# Printing the number of samples in the dataset
@@ -55,17 +58,18 @@ if __name__ == '__main__':
 	embedding_dataset = embedding_dataset.train_test_split(test_size=0.5, shuffle=True, seed=42)
 
 	# Using the embeddings to train the model
-	reg_model = SVMClassifier()
-	reg_model.train(embedding_dataset['train'])
+	# clf_model = SVMClassifier()
+	clf_model = LinearClassifier()
+	clf_model.train(embedding_dataset['train'])
 	print_dataset_info(embedding_dataset['train'])
 
 	# Predict the values
-	results = reg_model.evaluate(embedding_dataset['test'])
+	results = clf_model.evaluate(embedding_dataset['test'])
 
 	# Print the results
 	guesses = 0
 	for result in results:
-		predicted_value = reg_model.classes[result['prediction']]
+		predicted_value = clf_model.classes[result['prediction']]
 		actual_value = result['value']
 		print(f"Word: {result['word']:20s}", end=' ')
 		print(f"Predicted class:", predicted_value, end='\t')
@@ -79,5 +83,5 @@ if __name__ == '__main__':
 	print(f"Validation accuracy: {guesses}/{len(results)} ({guesses/len(results)*100:.2f}%)")
 
 	# Print the relevance of each feature
-	features_relevance = reg_model.features_relevance
+	features_relevance = clf_model.features_relevance
 	print("Features relevance dimensions: ", features_relevance.shape)

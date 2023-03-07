@@ -17,15 +17,15 @@ import torch
 from torchmetrics import PearsonCorrCoef
 
 from tqdm import tqdm
-from data_processing.sentence_maker import PP_PATTERN, SP_PATTERN
-from experiments.base import Experiment
+from data_processing.data_reference import BiasDataReference, PropertyDataReference
+from experiments.base import Experiment, REBUILD
 from model.classification.base import AbstractClassifier
 from model.binary_scoring.polarization.base import PolarizationScorer
 from model.classification.factory import ClassifierFactory
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.caching.creation import get_cached_embeddings, get_cached_polarization_scores
+from utils.caching.creation import get_cached_polarization_scores
 from utils.config import Configurations, ConfigurationsGrid, Parameter
 from utils.const import DEVICE
 
@@ -33,21 +33,15 @@ from utils.const import DEVICE
 # Configurations to process data
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 6,
+	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
 	Parameter.CLASSIFIER_TYPE: 'linear',
 	Parameter.CROSSING_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
 
-protected_property = 'religion'
-stereotyped_property = 'verb'
-
-PROTECTED_WORDS_FILE_ID = 3
-STEREOTYPED_WORDS_FILE_ID = 1
-PROTECTED_TEMPLATES_FILE_ID = 0
-STEREOTYPED_TEMPLATES_FILE_ID = 1
-CROSSED_GENERATION_FILE_ID = 1
-REBUILD = False
+PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 1, 0)
+STEREOTYPED_PROPERTY = PropertyDataReference("criminality", "stereotyped", 1, 1)
+BIAS_GENERATION_ID = 1
 
 
 class MidstepAnalysis2Experiment(Experiment):
@@ -55,54 +49,7 @@ class MidstepAnalysis2Experiment(Experiment):
 	def __init__(self) -> None:
 		super().__init__("midstep analysis 2")
 
-	def _get_property_embeddings(self, property: str, property_type: str, words_file_id: int, templates_file_id: int, configs: Configurations) -> Dataset:
-		"""
-		Returns the embeddings for the given property.
-
-		:param property: The name of the property.
-		:param property_type: The type of the property. Must be "protected" or "stereotyped".
-		:param words_file_id: The id of the words file to use. (e.g. 01, 02, etc.)
-		:param templates_file_id: The id of the templates file to use. (e.g. 01, 02, etc.)
-		:param kwargs: Additional arguments to pass to the embedding function.
-		:return: The embeddings for the given property.
-		"""
-		pattern = PP_PATTERN if property_type == 'protected' else SP_PATTERN if property_type == 'stereotyped' else None
-		if pattern is None:
-			raise ValueError(f'Invalid property type: {property_type}. Must be "protected" or "stereotyped".')
-		words_file = f'data/{property_type}-p/{property}/words-{words_file_id:02d}.csv'
-		templates_file = f'data/{property_type}-p/{property}/templates-{templates_file_id:02d}.csv'
-		embeddings = get_cached_embeddings(property_name=property, property_pattern=pattern, words_file=words_file, templates_file=templates_file, configs=configs, rebuild=REBUILD)
-		squeezed_embs = embeddings['embedding'].squeeze().tolist()
-		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('pytorch')
-		return embeddings
-
-	def _get_embeddings(self, protected_property: str, stereotyped_property: str, configs: Configurations) -> tuple[Dataset, Dataset]:
-		"""
-		Returns the embeddings for the protected and stereotyped property.
-
-		:param protected_property: The name of the protected property.
-		:param stereotyped_property: The name of the stereotyped property.
-		:param num_max_tokens: The number of maximum tokens to consider in the embeddings.
-		:param num_templates: The number of templates to consider in the embeddings.
-		:return: A tuple containing the embeddings for the protected and stereotyped property.
-		"""
-		protected_embedding_dataset = self._get_property_embeddings(protected_property, 'protected', PROTECTED_WORDS_FILE_ID, PROTECTED_TEMPLATES_FILE_ID, configs).sort('word')
-		stereotyped_embedding_dataset = self._get_property_embeddings(stereotyped_property, 'stereotyped', STEREOTYPED_WORDS_FILE_ID, STEREOTYPED_TEMPLATES_FILE_ID, configs).sort('word')
-		if 'descriptor' in stereotyped_embedding_dataset.column_names:
-			stereotyped_embedding_dataset = stereotyped_embedding_dataset.filter(lambda x: x['descriptor'] != 'unused')
-		
-		# DEBUG
-		print("Protected embeddings length:", len(protected_embedding_dataset))
-		# for row in protected_embedding_dataset:
-		#	print(f"{row['word']:20s} {row['value']:10s} {row['descriptor']:10s} => {row['embedding'].shape}")
-		print("Stereotyped embeddings length:", len(stereotyped_embedding_dataset))
-		# for row in stereotyped_embedding_dataset:
-		# 	desc = row.get('descriptor', "")
-		# 	print(f"{row['word']:20s} {row['value']:20s} {desc:10s} => {row['embedding'].shape}")
-
-		return protected_embedding_dataset, stereotyped_embedding_dataset
-
-	def _get_polarization_scores(self, protected_property: str, stereotyped_property: str, configs: Configurations) -> Dataset:
+	def _get_polarization_scores(self, protected_property: PropertyDataReference, stereotyped_property: PropertyDataReference, configs: Configurations) -> Dataset:
 		"""
 		Returns the polarization cross-scores for the protected and stereotyped properties.
 		The cross scores are computed accordijng to the given parameters.
@@ -116,7 +63,8 @@ class MidstepAnalysis2Experiment(Experiment):
 			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
 			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
-		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(protected_property, stereotyped_property, generation_id=CROSSED_GENERATION_FILE_ID, configs=configs, rebuild=REBUILD)
+		bias_reference = BiasDataReference(protected_property, stereotyped_property, BIAS_GENERATION_ID)
+		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(bias_reference, configs=configs, rebuild=REBUILD)
 		# # DEBUG
 		# print("Protected entries length:", len(pp_entries))
 		# print(pp_entries)
@@ -178,9 +126,9 @@ class MidstepAnalysis2Experiment(Experiment):
 			print("Current parameters configuration:\n", configs, '\n')
 			
 			# Getting the embeddings
-			prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, configs)
+			prot_emb, stere_emb = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
 			# Getting the MLM scores
-			cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, configs)
+			cross_scores = self._get_polarization_scores(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
 			self._check_correspondence(stere_emb, cross_scores)
 
 			# Creating and training the classifier
@@ -196,6 +144,7 @@ class MidstepAnalysis2Experiment(Experiment):
 				else:
 					continue
 
+				# For each column of polarization scores, we compute the correlations
 				# Computing the correlations
 				correlations: list = []
 				for n in tqdm(range(2, 768+1)):
@@ -227,7 +176,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			last_configs = configs
 
 		# Save the results
-		folder = f"results/{protected_property}-{stereotyped_property}"
+		folder = f"results/{PROTECTED_PROPERTY.name}-{STEREOTYPED_PROPERTY.name}"
 		if not os.path.exists(folder):
 			os.makedirs(folder)
 		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
@@ -244,9 +193,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		pol_axis_max = ""
 		n_max = 0
 		for col in results.column_names:
-			print("Checking column", col)
-			if col.startswith("n"):
-				continue
+			# Check if the column is a polarization column
 			if not col.startswith(draw_configs.subget_mutables().to_abbrstr()):
 				continue
 			# Getting the max correlation for each dimension
@@ -264,8 +211,8 @@ class MidstepAnalysis2Experiment(Experiment):
 		print(f"Found in column: {pol_axis_max}, with midstep n = {n_max}")
 
 		# Now we have the column with the max correlation
-		prot_emb, stere_emb = self._get_embeddings(protected_property, stereotyped_property, draw_configs)
-		cross_scores = self._get_polarization_scores(protected_property, stereotyped_property, draw_configs)
+		prot_emb, stere_emb = self._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, draw_configs)
+		cross_scores = self._get_polarization_scores(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, draw_configs)
 		# Extracting the polarization scores for the Stereotyped words
 		sp_polar = cross_scores[f"polarization_{first_prot_value}_{second_prot_value}"].tolist()
 		first_prot_value_polar = min(sp_polar)
