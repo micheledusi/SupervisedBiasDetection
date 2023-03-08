@@ -124,8 +124,8 @@ class LinearClassifier(AbstractClassifier):
 			loss.backward()
 			# Updating the parameters
 			optimizer.step()
-			if epoch % 100 == 0:
-				print('Epoch {} => loss = {}'.format(epoch, loss.item()))
+			# if epoch % 100 == 0:
+			#	print('Epoch {} => loss = {}'.format(epoch, loss.item()))
 
 	def _predict(self, x: torch.Tensor) -> torch.Tensor:
 		x_var = Variable(x)
