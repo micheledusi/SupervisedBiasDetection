@@ -215,3 +215,14 @@ class AbstractClassifier(ABC):
 		# Add a column to the dataset containing the predictions.
 		return dataset.add_column(name="prediction", column=predictions).with_format("pytorch")
 
+	def prediction_to_value(self, dataset: Dataset) -> Dataset:
+		"""
+		This method gets the output of the evaluate method, and it maps the predictions 
+		to the corresponding values of the property.
+		The dataset must contain a column named "prediction" containing the predictions of the model.
+		The predicted values are added to the dataset in a column named "predicted_value".
+		"""
+		# Get the predictions and the corresponding values
+		predicted_values = [self.classes[pred] for pred in dataset["prediction"]]
+		# Add a column to the dataset containing the values.
+		return dataset.add_column(name="predicted_value", column=predicted_values)
