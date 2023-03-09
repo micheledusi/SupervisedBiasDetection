@@ -27,11 +27,11 @@ STEREOTYPED_PROPERTY = PropertyDataReference("verb", "stereotyped", 1, 1)
 
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
 	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.CROSSING_STRATEGY: 'pppl',
-	Parameter.POLARIZATION_STRATEGY: 'difference',
 })
+
+MIDSTEP: int = 80
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -65,14 +65,11 @@ class DimensionalityReductionExperiment(Experiment):
 		num_ster = len(ster_embs)
 		print(f"({num_prot} protected words + {num_ster} stereotyped words = {num_prot + num_ster} total words)")
 
-		# Reducing the dimensionality of the embeddings
-		midstep: int = 50
-
 		# 1. Reduction based on the weights of the classifier
 		# 2. Reduction based on PCA
 		classifier: AbstractClassifier = ClassifierFactory.create(configs)
 		classifier.train(protected_embedding_dataset)
-		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=midstep)
+		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)
 		reduced_midstep_prot_embs = reducer_1.reduce(prot_embs)
 
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_midstep_prot_embs, output_features=2)
@@ -112,6 +109,6 @@ class DimensionalityReductionExperiment(Experiment):
 		if not os.path.exists(folder):
 			os.makedirs(folder)
 		configs_descriptor: str = configs.subget(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER, Parameter.CLASSIFIER_TYPE).to_abbrstr()
-		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{midstep}.csv', index=False)
+		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{MIDSTEP}.csv', index=False)
 		
-		ScatterPlotter(results_ds, color_col='predicted_protected_value').show()
+		ScatterPlotter(results_ds, color_col='value').show()
