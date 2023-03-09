@@ -21,6 +21,8 @@ class BinaryClassesDict(ClassesDict):
 	"""
 	def __init__(self, labels: list[str] | tuple[str]) -> None:
 		super().__init__(labels)
+		if len(self.labels) != 2:
+			raise ValueError("The number of classes must be 2. Please, use the IndexedClassesDict class instead.")
 		self._classes = {
 			self.labels[0]: torch.Tensor([-1]), 
 			self.labels[1]: torch.Tensor([+1]),
@@ -36,6 +38,22 @@ class BinaryClassesDict(ClassesDict):
 			return self.labels[1]
 
 
+class IndexedClassesDict(ClassesDict):
+	"""
+	This class implements a dictionary of classes, with a fixed number of classes.
+	The classes are associated to a tensor of shape [1], with values 0, 1, 2, ..., #classes-1.
+	"""
+	def __init__(self, labels: list[str] | tuple[str]) -> None:
+		super().__init__(labels)
+		self._classes = {label: torch.Tensor([i]) for i, label in enumerate(self.labels)}
+
+	def get_tensor(self, value: str) -> torch.Tensor:
+		return self._classes[value]
+
+	def get_label(self, tensor: torch.Tensor) -> str:
+		return self.labels[int(tensor.item())]
+
+
 class SVMClassifier(AbstractClassifier):
 	"""
 	This class implements a classifier with a SVM model (from scikit-learn library).
@@ -47,7 +65,10 @@ class SVMClassifier(AbstractClassifier):
 
 	@property
 	def features_relevance(self) -> torch.Tensor:
-		return torch.Tensor(self._model.coef_).squeeze().abs()
+		features_relevance =  torch.Tensor(self._model.coef_).squeeze().abs()
+		if len(features_relevance.shape) == 2:
+			features_relevance = features_relevance.mean(dim=0)
+		return features_relevance
 
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
 		self._model.fit(x, y.ravel())
@@ -57,5 +78,8 @@ class SVMClassifier(AbstractClassifier):
 
 	def _compute_class_tensors(self, values: list[str]) -> ClassesDict:
 		labels: list[str] = sorted(set(values))
-		return BinaryClassesDict(labels)
+		if len(labels) == 2:
+			return BinaryClassesDict(labels)
+		else:
+			return IndexedClassesDict(labels)
 
