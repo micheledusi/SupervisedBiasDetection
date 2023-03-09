@@ -42,7 +42,7 @@ class TorchClassifier(torch.nn.Module):
 	def forward(self, x):
 		x.to(DEVICE)
 		out = self.linear(x)
-		# out = self.softmax(out)
+		out = self.softmax(out)
 		return out
 
 	@property
