@@ -53,6 +53,7 @@ DEFAULT_CENTER_EMBEDDINGS = False
 
 # Reduction configurations
 DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm' or 'linear'
+DEFAULT_REDUCTION_TYPE = 'pca' # 'pca' or 'tsne'
 
 # Crossed evaluation configurations
 DEFAULT_CROSSING_STRATEGY = 'pppl'	# 'pppl' or 'mlm'

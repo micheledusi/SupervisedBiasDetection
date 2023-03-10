@@ -18,9 +18,10 @@ from model.classification.base import AbstractClassifier
 from model.classification.chi import ChiSquaredTest
 from model.classification.factory import ClassifierFactory
 from model.embedding.center import EmbeddingCenterer
-from model.reduction.weights import WeightsSelectorReducer
 from model.reduction.composite import CompositeReducer
+from model.reduction.weights import WeightsSelectorReducer
 from model.reduction.pca import TrainedPCAReducer
+from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
@@ -31,10 +32,11 @@ configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
 	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.CENTER_EMBEDDINGS: True,
+	Parameter.REDUCTION_TYPE: 'pca',
+	Parameter.CENTER_EMBEDDINGS: False,
 })
 
-MIDSTEP: int = 30
+MIDSTEP: int = 100
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -76,13 +78,21 @@ class DimensionalityReductionExperiment(Experiment):
 		print(f"({num_prot} protected words + {num_ster} stereotyped words = {num_prot + num_ster} total words)")
 
 		# 1. Reduction based on the weights of the classifier
-		# 2. Reduction based on PCA
 		classifier: AbstractClassifier = ClassifierFactory.create(configs)
 		classifier.train(prot_dataset)
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)
 		reduced_midstep_prot_embs = reducer_1.reduce(prot_embs)
 
-		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_midstep_prot_embs, output_features=2)
+		# 2. Reduction based on PCA / t-SNE
+		reducer_2 = None
+		if configs[Parameter.REDUCTION_TYPE] == 'pca':
+			reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_midstep_prot_embs, output_features=2)
+		elif configs[Parameter.REDUCTION_TYPE] == 'tsne':
+			reducer_2: TSNEReducer = TSNEReducer(input_features=MIDSTEP, output_features=2)
+		else:
+			raise ValueError(f"Invalid reduction type: {configs[Parameter.REDUCTION_TYPE]}")
+		
+		# Combining the two reducers
 		reducer = CompositeReducer([
 			reducer_1,
 			reducer_2

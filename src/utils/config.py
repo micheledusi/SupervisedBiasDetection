@@ -19,13 +19,14 @@ class Parameter(Enum):
 	"""
 	TEMPLATES_SELECTED_NUMBER = "templates_selected_number", DEFAULT_TEMPLATES_SELECTED_NUMBER, "TM"
 	AVERAGE_TEMPLATES = "average_templates", DEFAULT_AVERAGE_TEMPLATES
+	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TK"
 	AVERAGE_TOKENS = "average_tokens", DEFAULT_AVERAGE_TOKENS
 	DISCARD_LONGER_WORDS = "discard_longer_words", DEFAULT_DISCARD_LONGER_WORDS
-	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TK"
+	CENTER_EMBEDDINGS = "center_embeddings", DEFAULT_CENTER_EMBEDDINGS, "CE"
 	CLASSIFIER_TYPE = "classifier", DEFAULT_CLASSIFIER_TYPE, "CL"
+	REDUCTION_TYPE = "reduction", DEFAULT_REDUCTION_TYPE, "RD"
 	CROSSING_STRATEGY = "crossing_strategy", DEFAULT_CROSSING_STRATEGY, "CR"
 	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
-	CENTER_EMBEDDINGS = "center_embeddings", DEFAULT_CENTER_EMBEDDINGS, "CE"
 
 	def __new__(cls, str_value: str, default: Any, abbr: str = None):
 		obj = object.__new__(cls)
