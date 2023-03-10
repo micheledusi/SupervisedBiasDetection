@@ -15,23 +15,26 @@ import torch
 from data_processing.data_reference import PropertyDataReference
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
+from model.classification.chi import ChiSquaredTest
 from model.classification.factory import ClassifierFactory
+from model.embedding.center import EmbeddingCenterer
 from model.reduction.weights import WeightsSelectorReducer
 from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 1, 0)
-STEREOTYPED_PROPERTY = PropertyDataReference("verb", "stereotyped", 1, 1)
+PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 2, 0)
+STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
+	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
 	Parameter.CLASSIFIER_TYPE: 'svm',
+	Parameter.CENTER_EMBEDDINGS: True,
 })
 
-MIDSTEP: int = 80
+MIDSTEP: int = 30
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -55,9 +58,16 @@ class DimensionalityReductionExperiment(Experiment):
 	def _execute(self, **kwargs) -> None:
 		
 		# Getting embeddings
-		protected_embedding_dataset, stereotyped_embedding_dataset = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
-		prot_embs = protected_embedding_dataset['embedding']
-		ster_embs = stereotyped_embedding_dataset['embedding']
+		prot_dataset, ster_dataset = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
+		
+		# Centering (optional)
+		if configs[Parameter.CENTER_EMBEDDINGS]:
+			centerer: EmbeddingCenterer = EmbeddingCenterer(configs)
+			prot_dataset = centerer.center(prot_dataset)
+			ster_dataset = centerer.center(ster_dataset)
+
+		prot_embs = prot_dataset['embedding']
+		ster_embs = ster_dataset['embedding']
 		embs = torch.cat((prot_embs, ster_embs), dim=0)
 		print("Embeddings obtained")
 		print("Total number of embeddings:", len(embs))
@@ -68,7 +78,7 @@ class DimensionalityReductionExperiment(Experiment):
 		# 1. Reduction based on the weights of the classifier
 		# 2. Reduction based on PCA
 		classifier: AbstractClassifier = ClassifierFactory.create(configs)
-		classifier.train(protected_embedding_dataset)
+		classifier.train(prot_dataset)
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)
 		reduced_midstep_prot_embs = reducer_1.reduce(prot_embs)
 
@@ -88,27 +98,59 @@ class DimensionalityReductionExperiment(Experiment):
 		print("Reduced total embeddings shape:", reduced_embs.shape)
 
 		# Predicting the values with the classifier
-		prot_prediction_dataset: Dataset = classifier.evaluate(protected_embedding_dataset)
-		ster_prediction_dataset: Dataset = classifier.evaluate(stereotyped_embedding_dataset)
+		prot_prediction_dataset: Dataset = classifier.evaluate(prot_dataset)
+		ster_prediction_dataset: Dataset = classifier.evaluate(ster_dataset)
 		predictions: torch.Tensor = torch.cat((prot_prediction_dataset['prediction'], ster_prediction_dataset['prediction']), dim=0)
 		predicted_values: list[str] = [classifier.classes[p] for p in predictions]
+
+		# Trying to predict the protected property with a new classifier, trained on the midstep-reduced embeddings
+		midstep_classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		midstep_prot_dataset: Dataset = Dataset.from_dict({'embedding': reduced_midstep_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
+		midstep_ster_dataset: Dataset = Dataset.from_dict({'embedding': reducer_1.reduce(ster_embs), 'value': ster_dataset['value']}).with_format('torch')
+		midstep_classifier.train(midstep_prot_dataset)
+		midstep_prot_prediction_dataset: Dataset = midstep_classifier.evaluate(midstep_prot_dataset)
+		midstep_ster_prediction_dataset: Dataset = midstep_classifier.evaluate(midstep_ster_dataset)
+		midstep_predictions: torch.Tensor = torch.cat((midstep_prot_prediction_dataset['prediction'], midstep_ster_prediction_dataset['prediction']), dim=0)
+		midstep_predicted_values: list[str] = [midstep_classifier.classes[p] for p in midstep_predictions]
+
+		# Trying to predict the protected property with a new classifier, trained on the reduced embeddings
+		reduced_classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		reduced_prot_dataset: Dataset = Dataset.from_dict({'embedding': reduced_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
+		reduced_ster_dataset: Dataset = Dataset.from_dict({'embedding': reduced_ster_embs, 'value': ster_dataset['value']}).with_format('torch')
+		reduced_classifier.train(reduced_prot_dataset)
+		reduced_prot_prediction_dataset: Dataset = reduced_classifier.evaluate(reduced_prot_dataset)
+		reduced_ster_prediction_dataset: Dataset = reduced_classifier.evaluate(reduced_ster_dataset)
+		reduced_predictions: torch.Tensor = torch.cat((reduced_prot_prediction_dataset['prediction'], reduced_ster_prediction_dataset['prediction']), dim=0)
+		reduced_predicted_values: list[str] = [reduced_classifier.classes[p] for p in reduced_predictions]
 		
 		# Aggregating the results to show them
 		results_ds = Dataset.from_dict({
-			'word': protected_embedding_dataset['word'] + stereotyped_embedding_dataset['word'],
+			'word': prot_dataset['word'] + ster_dataset['word'],
 			'type': ['protected'] * num_prot + ['stereotyped'] * num_ster,
-			'value': protected_embedding_dataset['value'] + stereotyped_embedding_dataset['value'],
+			'value': prot_dataset['value'] + ster_dataset['value'],
 			'x': reduced_embs[:, 0],
 			'y': reduced_embs[:, 1],
-			'prediction': predictions,
-			'predicted_protected_value': predicted_values,
+			'original_prediction': predictions,
+			'original_predicted_protected_value': predicted_values,
+			'midstep_prediction': midstep_predictions,
+			'midstep_predicted_protected_value': midstep_predicted_values,
+			'reduced_prediction': reduced_predictions,
+			'reduced_predicted_protected_value': reduced_predicted_values
 			})
 
 		# If the directory does not exist, it will be created
 		folder: str = f'results/{PROTECTED_PROPERTY.name}-{STEREOTYPED_PROPERTY.name}'
 		if not os.path.exists(folder):
 			os.makedirs(folder)
-		configs_descriptor: str = configs.subget(Parameter.MAX_TOKENS_NUMBER, Parameter.TEMPLATES_SELECTED_NUMBER, Parameter.CLASSIFIER_TYPE).to_abbrstr()
+		configs_descriptor: str = configs.to_abbrstr()
 		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{MIDSTEP}.csv', index=False)
+
+		# Chi-squared test
+		chi2 = ChiSquaredTest(verbose=True)
+		filter_ster = lambda x: x['type'] == 'stereotyped'
+		print("Original predictions, for N = 768:")
+		_, p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'original_predicted_protected_value')
+		print(f"Midstep predictions, for N = {MIDSTEP}:")
+		_, p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'midstep_predicted_protected_value')
 		
-		ScatterPlotter(results_ds, color_col='value').show()
+		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {MIDSTEP}, confidence = {100 - p_value*100:10.8f}%)", color_col='value').show()

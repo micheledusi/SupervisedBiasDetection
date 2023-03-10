@@ -25,6 +25,7 @@ class Parameter(Enum):
 	CLASSIFIER_TYPE = "classifier", DEFAULT_CLASSIFIER_TYPE, "CL"
 	CROSSING_STRATEGY = "crossing_strategy", DEFAULT_CROSSING_STRATEGY, "CR"
 	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
+	CENTER_EMBEDDINGS = "center_embeddings", DEFAULT_CENTER_EMBEDDINGS, "CE"
 
 	def __new__(cls, str_value: str, default: Any, abbr: str = None):
 		obj = object.__new__(cls)
