@@ -131,3 +131,6 @@ dmypy.json
 # Project specific
 cache/
 results/
+
+# Utility (local) scripts
+*.sh
