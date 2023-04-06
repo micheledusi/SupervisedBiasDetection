@@ -79,10 +79,11 @@ class ChiSquaredTest:
 		:param dataset: The dataset to test.
 		:param x1: The name of the first column, i.e. the first categorical variable.
 		:param x2: The name of the second column, i.e. the second categorical variable.
-		:return: The p-value of the test.
+		:return: A tuple containing the Chi-Squared statistic and the p-value.
 		"""
 		# Count the number of occurrences of each value in the two columns
 		classes_x1, classes_x2, observed = self._count_observed(dataset[x1], dataset[x2])
+		# print(classes_x1, classes_x2, observed)
 		# Compute the expected frequencies
 		expected = self._compute_expected(observed)
 		# Compute the Chi-Squared statistic
@@ -94,7 +95,7 @@ class ChiSquaredTest:
 		if self._verbose:
 			self._print_table("Observed frequencies:", classes_x1, classes_x2, observed)
 			self._print_table("Expected frequencies:", classes_x1, classes_x2, expected)
-			print(f"Chi-Squared statistic: {chi_squared}")
+			print(f"Chi-Squared statistic: {chi_squared.item()}")
 			print(f"p-value: {p_value}")
 		
-		return chi_squared, p_value
+		return chi_squared.item(), p_value

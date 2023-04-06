@@ -25,18 +25,18 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 2, 0)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
+PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 0)
+STEREOTYPED_PROPERTY = PropertyDataReference("profession", "stereotyped", 2, 1)
 
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
 	Parameter.CLASSIFIER_TYPE: 'svm',
 	Parameter.REDUCTION_TYPE: 'pca',
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
-MIDSTEP: int = 100
+MIDSTEP: int = 42
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -159,8 +159,16 @@ class DimensionalityReductionExperiment(Experiment):
 		chi2 = ChiSquaredTest(verbose=True)
 		filter_ster = lambda x: x['type'] == 'stereotyped'
 		print("Original predictions, for N = 768:")
-		_, p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'original_predicted_protected_value')
+		original_chi_sq, original_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'original_predicted_protected_value')
 		print(f"Midstep predictions, for N = {MIDSTEP}:")
-		_, p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'midstep_predicted_protected_value')
+		midstep_chi_sq, midstep_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'midstep_predicted_protected_value')
+		print("Reduced predictions, for N = 2:")
+		reduced_chi_sq, reduced_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'reduced_predicted_protected_value')
+
+		print("Compared results:")
+		print(f"Classification in the ORIGINAL embeddings:       p-value = {original_p_value:10.8f}     chi-squared = {original_chi_sq:10.8f}")
+		print(f"Classification in the MIDSTEP  embeddings:       p-value = { midstep_p_value:10.8f}     chi-squared = { midstep_chi_sq:10.8f}")
+		print(f"Classification in the REDUCED  embeddings:       p-value = { reduced_p_value:10.8f}     chi-squared = { reduced_chi_sq:10.8f}")
+		print("(The lower the p-value, the higher the probability that the embeddings are stereotyped)\n")
 		
-		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {MIDSTEP}, confidence = {100 - p_value*100:10.8f}%)", color_col='value').show()
+		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {MIDSTEP}, confidence = {100 - midstep_p_value*100:10.8f}%)", color_col='value').show()
