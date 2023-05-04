@@ -30,15 +30,15 @@ from utils.const import DEVICE
 # Configurations to process data
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
+	Parameter.TEMPLATES_SELECTED_NUMBER: 1,
 	Parameter.CLASSIFIER_TYPE: 'svm',
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
 MIDSTEPS: list[int] = list(range(2, 768+1))
 
-PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 0)
-STEREOTYPED_PROPERTY = PropertyDataReference("profession", "stereotyped", 2, 1)
+PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 4, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 BIAS_GENERATION_ID = 1
 
 

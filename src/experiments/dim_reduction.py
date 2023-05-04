@@ -25,8 +25,8 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 0)
-STEREOTYPED_PROPERTY = PropertyDataReference("profession", "stereotyped", 2, 1)
+PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 2, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
