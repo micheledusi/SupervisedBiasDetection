@@ -1,6 +1,4 @@
 word,value,descriptor
-christian,christian,adj-person
-muslim,muslim,adj-person
-jewish,jewish,adj-person
-buddhist,buddhist,adj-person
-atheist,atheist,adj-person
+christian,christian,person-adjective
+muslim,muslim,person-adjective
+jewish,jewish,person-adjective
