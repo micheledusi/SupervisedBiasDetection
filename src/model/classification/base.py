@@ -213,7 +213,8 @@ class AbstractClassifier(ABC):
 		predictions = self._predict(inputs).tolist()
 
 		# Add a column to the dataset containing the predictions.
-		return dataset.add_column(name="prediction", column=predictions).with_format("pytorch")
+		results: Dataset = dataset.add_column(name="prediction", column=predictions, new_fingerprint="prediction")
+		return results.with_format("torch")
 
 	def prediction_to_value(self, dataset: Dataset) -> Dataset:
 		"""

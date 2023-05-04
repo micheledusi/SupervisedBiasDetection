@@ -13,6 +13,7 @@ from datasets import disable_caching
 from experiments.dim_reduction import DimensionalityReductionExperiment
 from experiments.midstep_analysis_2 import MidstepAnalysis2Experiment
 from experiments.midstep_chi_squared import MidstepAnalysisChiSquared
+from experiments.classification import ClassificationExperiment
 
 # Libraries setup
 torch.manual_seed(42)
@@ -24,4 +25,6 @@ if __name__ == "__main__":
 	
 	# MidstepAnalysis2Experiment().run()
 
-	DimensionalityReductionExperiment().run()
+	# DimensionalityReductionExperiment().run()
+
+	ClassificationExperiment().run()
