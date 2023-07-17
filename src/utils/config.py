@@ -28,6 +28,7 @@ class Parameter(Enum):
 	REDUCTION_TYPE = "reduction", DEFAULT_REDUCTION_TYPE, "RD"
 	CROSSING_STRATEGY = "crossing_strategy", DEFAULT_CROSSING_STRATEGY, "CR"
 	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
+	EMBEDDINGS_DISTANCE_STRATEGY = "embeddings_distance_strategy", DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY, "EDIST"
 
 	def __new__(cls, str_value: str, default: Any, abbr: str = None):
 		obj = object.__new__(cls)

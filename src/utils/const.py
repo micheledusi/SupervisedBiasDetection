@@ -59,3 +59,6 @@ DEFAULT_REDUCTION_TYPE = 'pca' # 'pca' or 'tsne'
 # Crossed evaluation configurations
 DEFAULT_CROSSING_STRATEGY = 'pppl'	# 'pppl' or 'mlm'
 DEFAULT_POLARIZATION_STRATEGY = 'ratio'		# 'difference' or 'ratio'
+
+# Separation configurations
+DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY = 'euclidean'	# 'euclidean' or 'cosine'
