@@ -25,7 +25,7 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 2, 1)
+PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 1)
 STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 
 configs = Configurations({
@@ -36,7 +36,7 @@ configs = Configurations({
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
-MIDSTEP: int = 42
+MIDSTEP: int = 200
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -172,3 +172,6 @@ class DimensionalityReductionExperiment(Experiment):
 		print("(The lower the p-value, the higher the probability that the embeddings are stereotyped)\n")
 		
 		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {MIDSTEP}, confidence = {100 - midstep_p_value*100:10.8f}%)", color_col='value').show()
+
+		# Printing the result file path
+		print("\nResults saved to CSV file:", folder + f'/reduced_data_{configs_descriptor}_N{MIDSTEP}.csv\n')
