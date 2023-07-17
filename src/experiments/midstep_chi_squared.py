@@ -30,14 +30,14 @@ from utils.const import DEVICE
 # Configurations to process data
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 1,
+	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
 	Parameter.CLASSIFIER_TYPE: 'svm',
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
 MIDSTEPS: list[int] = list(range(2, 768+1))
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 4, 1)
+PROTECTED_PROPERTY = PropertyDataReference("ethnicity", "protected", 1, 1)
 STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 BIAS_GENERATION_ID = 1
 
@@ -106,6 +106,7 @@ class MidstepAnalysisChiSquared(Experiment):
 		# the parameters that cannot change from one experiment to another.
 		filename = f"aggregated_midstep_chi_squared_{configs.subget_immutables().to_abbrstr()}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)
+		print(f"Results saved in {folder}/{filename}")
 
 
 
