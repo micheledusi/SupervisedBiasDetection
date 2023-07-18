@@ -37,7 +37,7 @@ configurations = ConfigurationsGrid({
 
 MIDSTEPS: list[int] = list(range(2, 768+1))
 
-PROTECTED_PROPERTY = PropertyDataReference("ethnicity", "protected", 1, 1)
+PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 1, 1)
 STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 BIAS_GENERATION_ID = 1
 
