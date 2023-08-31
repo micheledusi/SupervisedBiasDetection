@@ -33,6 +33,8 @@ configs = Configurations({
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
+OUTPUT_NAME_REDUCED_EMBEDDINGS = "reduced_embeddings_classification"
+
 
 class DimensionalityReductionExperiment(Experiment):
 	"""
@@ -55,7 +57,7 @@ class DimensionalityReductionExperiment(Experiment):
 	def _execute(self, **kwargs) -> None:
 		
 		# Getting embeddings
-		prot_dataset, ster_dataset = Experiment._get_embeddings(self.protected_property, self.stereotyped_property, configs)
+		prot_dataset, ster_dataset = self._get_embeddings(configs)
 		
 		# Centering (optional)
 		if configs[Parameter.CENTER_EMBEDDINGS]:
@@ -146,7 +148,8 @@ class DimensionalityReductionExperiment(Experiment):
 		# If the directory does not exist, it will be created
 		folder: str = self._get_results_folder(configs, prot_dataset, ster_dataset)
 		configs_descriptor: str = configs.to_abbrstr()
-		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{self.midstep}.csv', index=False)
+		filename: str = OUTPUT_NAME_REDUCED_EMBEDDINGS + f"_{configs_descriptor}_N{self.midstep}.csv"
+		results_ds.to_csv(folder + '/' + filename, index=False)
 
 		# Chi-squared test
 		chi2 = ChiSquaredTest(verbose=True)
@@ -167,4 +170,4 @@ class DimensionalityReductionExperiment(Experiment):
 		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {self.midstep}, confidence = {100 - midstep_p_value*100:10.8f}%)", color_col='value').show()
 
 		# Printing the result file path
-		print("\nResults saved to CSV file:", folder + f'/reduced_data_{configs_descriptor}_N{self.midstep}.csv\n')
+		print("\nResults saved to CSV file:", f'{folder}/{filename}n')

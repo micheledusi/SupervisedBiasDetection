@@ -37,6 +37,7 @@ configurations = ConfigurationsGrid({
 
 MIDSTEPS: list[int] = list(range(2, 768+1))
 BIAS_GENERATION_ID = 1
+OUTPUT_NAME_MIDSTEP_ANALYSIS = "aggregated_midstep_chi_squared"
 
 
 class MidstepAnalysisChiSquared(Experiment):
@@ -99,7 +100,7 @@ class MidstepAnalysisChiSquared(Experiment):
 		folder: str = self._get_results_folder(configs, prot_dataset, ster_dataset)
 		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
 		# the parameters that cannot change from one experiment to another.
-		filename = f"aggregated_midstep_chi_squared_{configs.subget_immutables().to_abbrstr()}.csv"
+		filename = f"{OUTPUT_NAME_MIDSTEP_ANALYSIS}_{configs.subget_immutables().to_abbrstr()}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)
 		print(f"Results saved in {folder}/{filename}")
 

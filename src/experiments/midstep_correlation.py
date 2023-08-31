@@ -33,16 +33,18 @@ from utils.const import DEVICE
 # Configurations to process data
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 3,
-	Parameter.CLASSIFIER_TYPE: 'linear',
+	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
+	Parameter.CLASSIFIER_TYPE: 'svm',
 	Parameter.CROSSING_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
 
 BIAS_GENERATION_ID = 1
+OUTPUT_NAME_MIDSTEP_ANALYSIS = "aggregated_midstep_correlation"
+OUTPUT_NAME_REDUCED_EMBEDDINGS = "reduced_embeddings_correlation"
 
 
-class MidstepAnalysis2Experiment(Experiment):
+class MidstepAnalysisCorrelation(Experiment):
 
 	def __init__(self) -> None:
 		super().__init__("midstep analysis 2", required_kwargs=['prot_prop', 'ster_prop'])
@@ -179,8 +181,9 @@ class MidstepAnalysis2Experiment(Experiment):
 		folder: str = self._get_results_folder(last_configs, prot_dataset, ster_dataset)
 		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
 		# the parameters that cannot change from one experiment to another.
-		filename = f"aggregated_midstep_correlation_{configs.subget_immutables().to_abbrstr()}.csv"
+		filename = f"{OUTPUT_NAME_MIDSTEP_ANALYSIS}_{configs.subget_immutables().to_abbrstr()}.csv"
 		results.to_csv(f"{folder}/{filename}", index=False)
+		print(f"Results saved in {folder}/{filename}")
 
 		###################################################################
 		# Drawing
@@ -256,7 +259,8 @@ class MidstepAnalysis2Experiment(Experiment):
 	
 		# Print the reduced embeddings to CSV file
 		config_str = draw_configs.to_abbrstr()
-		filename = f"reduced_embeddings_{config_str}_n{n_max}.csv"
+		filename = f"{OUTPUT_NAME_REDUCED_EMBEDDINGS}_{config_str}_n{n_max}.csv"
 		plot_results.to_csv(f"{folder}/{filename}", index=False)
+		print(f"Reduced embeddings saved in {folder}/{filename}")
 
 
