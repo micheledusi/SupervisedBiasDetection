@@ -39,23 +39,19 @@ configurations = ConfigurationsGrid({
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 1, 0)
-STEREOTYPED_PROPERTY = PropertyDataReference("criminality", "stereotyped", 1, 1)
 BIAS_GENERATION_ID = 1
 
 
 class MidstepAnalysis2Experiment(Experiment):
 
 	def __init__(self) -> None:
-		super().__init__("midstep analysis 2")
+		super().__init__("midstep analysis 2", required_kwargs=['prot_prop', 'ster_prop'])
 
-	def _get_polarization_scores(self, protected_property: PropertyDataReference, stereotyped_property: PropertyDataReference, configs: Configurations) -> Dataset:
+	def _get_polarization_scores(self, configs: Configurations) -> Dataset:
 		"""
 		Returns the polarization cross-scores for the protected and stereotyped properties.
 		The cross scores are computed accordijng to the given parameters.
 
-		:param protected_property: The name of the protected property, from which the protected dataset is obtained.
-		:param stereotyped_property: The name of the stereotyped property, from which the stereotyped dataset is obtained.
 		:param num_max_tokens: The number of maximum tokens to consider in the embeddings.
 		:param cross_score_type: The type of cross-score to compute. Current supported values are 'pppl' and 'mlm'.
 		:param polarization_strategy: The strategy to use to compute the polarization. Current supported values are 'difference' and 'ratio'.
@@ -63,7 +59,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			while each column is associated with a polarization between two protected values. The values in the dataset are the polarizations between cross-scores.
 			E.g. For properties "gender" and "occupation", we can take the row for "nurse" and the column for the "male-female" polarization.
 		"""
-		bias_reference = BiasDataReference(protected_property, stereotyped_property, BIAS_GENERATION_ID)
+		bias_reference = BiasDataReference(self.protected_property, self.stereotyped_property, BIAS_GENERATION_ID)
 		pp_entries, sp_entries, polarization_scores = get_cached_polarization_scores(bias_reference, configs=configs, rebuild=REBUILD)
 		# # DEBUG
 		# print("Protected entries length:", len(pp_entries))
@@ -78,6 +74,9 @@ class MidstepAnalysis2Experiment(Experiment):
 		return polarization_scores.rename_column(PolarizationScorer.STEREOTYPED_ENTRIES_COLUMN, 'word').sort('word')
 	
 	def _check_correspondence(self, stereotyped_embedding_dataset: Dataset, polarization_scores: Dataset) -> None:
+		"""
+		Checks that the words in the "stereotyped embeddings dataset" and in the "polarization cross-scores dataset" are the same.
+		"""
 		assert len(stereotyped_embedding_dataset) == len(polarization_scores), f"Expected the same number of words in the \"stereotyped embeddings dataset\" and in the \"polarization cross-scores dataset\", but got {len(stereotyped_embedding_dataset)} and {len(polarization_scores)}."
 		for w1, w2 in zip(stereotyped_embedding_dataset['word'], polarization_scores['word']):
 			assert w1 == w2, f"Expected the same words in the \"stereotyped embeddings dataset\" and in the \"polarization cross-scores dataset\", but got {w1} and {w2}."
@@ -118,6 +117,7 @@ class MidstepAnalysis2Experiment(Experiment):
 		return torch.Tensor(coefs).to(DEVICE)
 
 	def _execute(self, **kwargs) -> None:
+
 		results: Dataset = Dataset.from_dict({"n": list(range(2, 768+1))})
 
 		last_configs: Configurations = None
@@ -126,14 +126,14 @@ class MidstepAnalysis2Experiment(Experiment):
 			print("Current parameters configuration:\n", configs, '\n')
 			
 			# Getting the embeddings
-			prot_emb, stere_emb = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
-			# Getting the MLM scores
-			cross_scores = self._get_polarization_scores(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
-			self._check_correspondence(stere_emb, cross_scores)
+			prot_dataset, ster_dataset = self._get_embeddings(configs)
+			# Getting the PPPL / MLM scores
+			cross_scores = self._get_polarization_scores(configs)
+			self._check_correspondence(ster_dataset, cross_scores)
 
 			# Creating and training the classifier
 			classifier: AbstractClassifier = ClassifierFactory.create(configs)
-			classifier.train(prot_emb)
+			classifier.train(prot_dataset)
 
 			# For each polarization column, we compute the correlations
 			polarization_prefix = 'polarization_'
@@ -152,7 +152,7 @@ class MidstepAnalysis2Experiment(Experiment):
 					# First, we compute the 2D embeddings with the composite reducer, with the current value of midstep "n"
 					# Note: if an exception occurs, we stop the experiment
 					try:
-						reduced_embeddings = self._reduce_with_midstep(prot_emb, stere_emb, n, classifier)
+						reduced_embeddings = self._reduce_with_midstep(prot_dataset, ster_dataset, n, classifier)
 						current_correlation = self._compute_correlation(reduced_embeddings, cross_scores[pol_column].to(DEVICE))
 						# The resulting tensor has a correlation value for each coordinate of the reduced embeddings (in this case, 2)
 						correlations.append(current_correlation)
@@ -176,9 +176,7 @@ class MidstepAnalysis2Experiment(Experiment):
 			last_configs = configs
 
 		# Save the results
-		folder = f"results/{PROTECTED_PROPERTY.name}-{STEREOTYPED_PROPERTY.name}"
-		if not os.path.exists(folder):
-			os.makedirs(folder)
+		folder: str = self._get_results_folder(last_configs, prot_dataset, ster_dataset)
 		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
 		# the parameters that cannot change from one experiment to another.
 		filename = f"aggregated_midstep_correlation_{configs.subget_immutables().to_abbrstr()}.csv"
@@ -211,8 +209,8 @@ class MidstepAnalysis2Experiment(Experiment):
 		print(f"Found in column: {pol_axis_max}, with midstep n = {n_max}")
 
 		# Now we have the column with the max correlation
-		prot_emb, stere_emb = self._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, draw_configs)
-		cross_scores = self._get_polarization_scores(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, draw_configs)
+		prot_dataset, ster_dataset = self._get_embeddings(draw_configs)
+		cross_scores = self._get_polarization_scores(draw_configs)
 		# Extracting the polarization scores for the Stereotyped words
 		sp_polar = cross_scores[f"polarization_{first_prot_value}_{second_prot_value}"].tolist()
 		first_prot_value_polar = min(sp_polar)
@@ -222,25 +220,25 @@ class MidstepAnalysis2Experiment(Experiment):
 		 	first_prot_value_polar if val == first_prot_value 
 		 	else second_prot_value_polar if val == second_prot_value
 			else None,  
-			prot_emb['value']))
+			prot_dataset['value']))
 		
 		polarizations = sp_polar + pp_polar
 		types = ['stereotyped'] * len(sp_polar) + ['protected'] * len(pp_polar)
-		words = stere_emb['word'] + prot_emb['word']
-		values = stere_emb['value'] + prot_emb['value']
+		words = ster_dataset['word'] + prot_dataset['word']
+		values = ster_dataset['value'] + prot_dataset['value']
 
 		# Creating and training the classifier
 		classifier: AbstractClassifier = ClassifierFactory.create(draw_configs)
-		classifier.train(prot_emb)
+		classifier.train(prot_dataset)
 		
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=n_max)
-		prot_input: torch.Tensor = prot_emb['embedding'].to(DEVICE)
+		prot_input: torch.Tensor = prot_dataset['embedding'].to(DEVICE)
 		reduced_protected_embeddings = reducer_1.reduce(prot_input).to(DEVICE)
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
 		reducer = CompositeReducer([reducer_1, reducer_2])
 
 		# Using the reducer to reduce BOTH protected and stereotyped embeddings
-		all_embeddings = torch.cat((stere_emb['embedding'], prot_emb['embedding']))
+		all_embeddings = torch.cat((ster_dataset['embedding'], prot_dataset['embedding']))
 		reduced_embeddings = reducer.reduce(all_embeddings).to(DEVICE)
 		print("Reduced embeddings shape:", reduced_embeddings.shape)
 

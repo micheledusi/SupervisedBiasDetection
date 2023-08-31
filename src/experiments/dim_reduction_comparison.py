@@ -26,9 +26,6 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("ethnicity", "protected", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("criminality", "stereotyped", 1, 1)
-
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
@@ -37,7 +34,6 @@ configs = Configurations({
 	Parameter.CENTER_EMBEDDINGS: False,
 })
 
-MIDSTEP: int = 10
 
 
 class DimensionalityReductionsComparisonExperiment(Experiment):
@@ -50,12 +46,12 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 	"""
 
 	def __init__(self) -> None:
-		super().__init__("dimensionality reduction")
+		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'])
 
 	def _execute(self, **kwargs) -> None:
-		
+
 		# Getting embeddings
-		prot_dataset, ster_dataset = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
+		prot_dataset, ster_dataset = Experiment._get_embeddings(self.protected_property, self.stereotyped_property, configs)
 		
 		# Centering (optional)
 		if configs[Parameter.CENTER_EMBEDDINGS]:
@@ -82,20 +78,20 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		reducers.append(WeightsSelectorReducer.from_classifier(classifier, output_features=768))
 
 		# 1. WeightsSelectorReducer: 768 --> MIDSTEP    	*** This is the one used in the paper ***
-		reducers.append(WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)) 
+		reducers.append(WeightsSelectorReducer.from_classifier(classifier, output_features=self.midstep)) 
 
 		# 2. WeightsSelectorReducer: 768 --> 2
 		reducers.append(WeightsSelectorReducer.from_classifier(classifier, output_features=2))
 
 		# 3. Reductor based on PCA/t-SNE: 768 --> min(len(prot_embs), MIDSTEP)
-		out_dim = min(len(prot_embs), MIDSTEP)
+		out_dim = min(len(prot_embs), self.midstep)
 		reducers.append(self._get_classic_reducer(prot_embs, out_dim=out_dim))
 
 		# 4. Reductor based on PCA/t-SNE: 768 --> 2
 		reducers.append(self._get_classic_reducer(prot_embs, out_dim=2))
 
 		# 5. Composite reducer: 768 --> MIDSTEP --> 2
-		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)
+		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=self.midstep)
 		reducers.append(CompositeReducer([
 			reducer_1,
 			self._get_classic_reducer(reducer_1.reduce(prot_embs), out_dim=2)

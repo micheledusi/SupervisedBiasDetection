@@ -1,0 +1,474 @@
+word,salary,value
+Oil Tycoon,"15,000,000",high
+Basketball Player,"5,200,000",high
+Baseball Player,"3,730,000",high
+Hockey Player,"1,150,000",high
+Baseball Manager,"825,000",high
+Football Player,"770,000",high
+NASCAR Racecar Driver,"500,000",high
+Cosmetic Surgeon,"408,000",high
+Tennis Player,"400,000",high
+Urologist,"396,233",high
+Brain Surgeon,"393,000",high
+Radiologist,"375,000",high
+Golfer,"322,491",high
+Hedge Fund Manager,"312,330",high
+Dermatologist,"306,210",high
+Anesthesiologist,"300,000",high
+Cardiologist,"300,000",high
+Union Head,"300,000",high
+Ophthalmologist,"263,322",high
+Pathologist,"258,000",high
+HMO Executive,"250,000",high
+Proctologist,"245,620",high
+Oncologist,"237,803",high
+Surgeon,"233,150",high
+Neurologist,"230,000",high
+Immunologist,"225,540",high
+Concierge Doctor,"225,000",high
+Nephrologist,"224,827",high
+Oral Surgeon,"220,000",high
+Sports Physician,"203,300",high
+Orthodontist,"200,000",high
+Screenwriter,"200,000",high
+Obstetrician,"187,200",high
+Geriatrician,"183,523",high
+Endocrinologist,"179,291",high
+Psychiatrist,"178,950",high
+General Practitioner,"176,530",high
+Senator,"174,000",high
+Pediatrician,"157,610",high
+Law Professor,"152,900",high
+Pharmaceutical Scientist,"149,400",high
+Dentist,"149,310",high
+Rabbi,"140,000",high
+Production Designer,"130,000",high
+Air Traffic Controller,"122,530",high
+Marketing Manager,"119,480",high
+Film Score Composer,"119,000",high
+Pharmacist,"116,670",high
+Podiatrist,"116,440",high
+Mutual Fund Manager,"115,200",high
+Commercial Airline Pilot,"115,000",high
+Trial Lawyer,"114,300",high
+Entertainment Lawyer,"113,530",high
+Lawyer,"113,530",high
+Oceanographer,"108,420",high
+Physicist,"106,840",high
+Astrophysicist,"106,360",high
+FBI Agent,"106,310",high
+Astronomer,"106,000",high
+Nuclear Engineer,"104,270",high
+Aerospace Engineer,"103,720",high
+Judge,"102,980",high
+Computer Scientist,"102,190",high
+IT Manager,"102,000",high
+Political Scientist,"102,000",high
+Cryptographer,"100,000",high
+Mathematician,"100,000",high
+Soccer Player,"100,000",high
+Sports Agent,"100,000",high
+Web Product Manager,"100,000",high
+Investment Banker,"99,940",high
+HR Director,"99,720",high
+Corporate Lawyer,"98,290",high
+Seismologist,"98,130",high
+Optometrist,"97,820",high
+Justice of the Peace,"97,000",high
+Geologist,"96,000",high
+Federal Prosecutor,"95,000",high
+Chemical Engineer,"94,350",high
+Robotics Engineer,"94,310",high
+Shipwright,"94,040",high
+Actuary,"93,680",high
+Flight Instructor,"93,340",high
+Midwife,"93,000",high
+Meteorologist,"92,920",high
+Economist,"91,860",high
+Solar Energy Engineer,"90,580",high
+Oil Rig Worker,"90,000",high
+Submarine Commander,"90,000",high
+Electrical Engineer,"89,630",high
+Foreign Service Officer,"88,000",high
+Medical Writer,"88,000",high
+School Principal,"88,000",high
+Fighter Pilot,"87,350",high
+Aviation Safety Inspector,"87,000",high
+Geothermal Engineer,"87,000",high
+Holistic Medicine Practitioner,"86,729",high
+Acupuncturist,"85,740",high
+Materials Engineer,"85,000",high
+Veterinarian,"84,460",high
+Astronaut,"82,700",high
+Art Director,"80,880",high
+Database Administrator,"80,280",high
+Celebrity Personal Assistant,"80,000",high
+Political Campaign Manager,"80,000",high
+Real Estate Developer,"80,000",high
+Vice Principal,"80,000",high
+Physical Therapist,"79,860",high
+Cancer Biologist,"79,840",high
+Civil Engineer,"79,340",high
+Fuel Cell Engineer,"79,230",high
+Sportscaster,"79,050",high
+Toxicologist,"79,000",high
+Elevator Installer,"78,620",high
+Management Consultant,"78,600",high
+Criminal Justice Lawyer,"78,500",high
+App Developer,"78,000",high
+International Sales,"77,490",high
+Defense Engineer,"77,120",high
+Financial Analyst,"76,950",high
+Arbitrator,"76,840",high
+Customs and Immigration Inspector,"76,730",high
+Tank Commander,"76,320",high
+Stem Cell Biologist,"76,000",high
+TV Writer,"76,000",high
+Credit Analyst,"75,970",high
+Network Administrator,"75,790",high
+Boxer,"75,760",high
+Statistician,"75,560",high
+Limnologist,"75,530",high
+Microbiologist,"75,230",high
+Biological Scientist,"75,160",high
+Coast Guard,"75,000",high
+Polygraph Examiner,"75,000",high
+Roller Coaster Designer,"75,000",high
+Surgical Assistant,"75,000",high
+Talent Manager,"75,000",high
+Geneticist,"74,504",high
+Entrepreneur - Small Business,"74,460",high
+Criminal Investigator,"74,300",high
+Coder,"74,280",high
+Computer Programmer,"74,280",high
+Orthoptist,"73,400",high
+Farrier,"73,108",high
+Architect,"73,090",high
+Epidemiologist,"73,000",high
+Occupational Therapist,"73,000",high
+Logistician,"72,780",high
+Educational Psychologist,"72,710",high
+Ship Captain,"72,000",high
+Chemist,"71,770",high
+Stockbroker,"71,720",high
+Film Director,"71,350",high
+Film Producer,"71,350",high
+TV Commercial Director,"71,350",high
+Band Manager,"71,340",high
+Border Patrol Agent,"70,910",high
+Railroad Safety Inspector,"70,820",high
+Beekeeper,"70,110",high
+Crop Farmer,"70,110",high
+Linguist,"70,000",high
+Pharmaceutical Rep,"70,000",high
+Rugby Player,"70,000",high
+Stunt Performer,"70,000",high
+Audiologist,"69,720",high
+Psychologist,"69,280",high
+Art Therapist,"68,900",high
+Delta Force,"68,300",high
+Navy Seal,"68,300",high
+Child Psychologist,"68,000",high
+Energy Auditor,"67,280",high
+Mechanical Engineer,"66,437",high
+Fast Food Franchise Owner,"66,000",high
+Ultrasound Technician,"65,840",high
+Technical Writer,"65,500",high
+Nurse,"65,470",high
+Urban Planner,"65,230",high
+Air Marshal,"65,000",high
+Coroner,"65,000",high
+Entrepreneur,"65,000",high
+Loan Officer,"65,000",high
+Speech Therapist,"65,000",high
+Studio Musician,"65,000",high
+Talent Agent,"64,490",high
+Toy Designer,"64,180",high
+Environmental Scientist,"63,570",high
+Accountant,"63,550",high
+Herpetologist,"63,000",high
+Fashion Designer,"62,860",high
+Web Designer,"62,500",high
+Botanist,"62,400",high
+Video Game Designer,"62,310",high
+Home Care Nurse,"62,090",high
+Dean of Students,"62,000",high
+Life Coach,"62,000",high
+Energy Broker,"61,960",high
+Local Politician,"61,706",high
+Computer Animator,"61,370",high
+Conservationist,"61,100",high
+High School College Counselor,"60,560",high
+Secret Service Agent,"60,370",high
+Recycling Plant Manager,"60,366",high
+B&B Owner,"60,000",high
+Biosystems Engineer,"60,000",high
+Chiropractor,"60,000",high
+Film Distribution Agent,"60,000",high
+Literary Agent,"60,000",high
+Market Research Analyst,"60,000",high
+Paleontologist,"60,000",high
+Professional Gamer,"60,000",high
+Insurance Claims Adjuster,"59,850",high
+IRS Auditor,"59,310",high
+Restaurant Critic,"59,290",high
+Cytogenetic Technologist,"59,000",high
+Fashion Photographer,"59,000",high
+Public Administrator,"59,000",high
+Fire Investigator,"58,980",high
+Farm Research Scientist,"58,610",high
+Food Scientist,"58,610",high
+Zoologist,"57,710",high
+Cartographer,"57,440",high
+Anthropologist,"57,420",high
+Archaeologist,"57,420",high
+Egyptologist,"57,420",high
+Roadie,"57,000",high
+Postal Worker,"56,490",high
+Elementary teacher,"56,380",high
+middle school teacher,"56,380",high
+high school teacher,"56,380",high
+Surveyor,"56,230",high
+Commercial Bank Manager,"56,000",high
+Film Critic,"56,000",high
+Writer,"55,940",high
+Historian,"55,870",high
+Appraiser,"55,400",high
+Librarian,"55,370",high
+Police Officer,"55,270",high
+Dietitian,"55,240",low
+Aircraft Mechanic,"55,230",low
+Country Club Manager,"55,000",low
+Piano Shop Owner,"55,000",low
+Special Education Teacher,"55,000",low
+Train Conductor,"55,000",low
+Water Polo Player,"55,000",low
+Public Relations,"54,170",low
+Sports Announcer,"54,020",low
+Green Grocer Manager,"54,000",low
+Millwright,"54,000",low
+Copy Editor,"53,880",low
+Editor,"53,880",low
+Sex Education Teacher,"53,430",low
+Game Warden,"53,260",low
+Caterer,"53,000",low
+Stenographer,"53,000",low
+Mortgage Broker,"52,981",low
+Archivist,"52,930",low
+Forensic Scientist,"52,840",low
+Advice Columnist,"52,810",low
+Property Manager,"52,610",low
+Emergency Management Specialist,"52,590",low
+Diplomat,"52,572",low
+Parole Officer,"52,280",low
+Caddie,"52,000",low
+Lighting Designer,"52,000",low
+Sound Editor,"52,000",low
+Blacksmith,"51,981",low
+Actor,"51,880",low
+Musical Theater Performer,"51,880",low
+Hotel Manager,"51,827",low
+Taxidermist,"51,390",low
+Cinematographer,"51,300",low
+Film Editor,"51,300",low
+Public Defender,"51,190",low
+Marine Biologist,"51,180",low
+Dental Hygienist,"51,000",low
+Ecologist,"50,520",low
+Corporate Relocation Specialist,"50,000",low
+Hotel Chain Owner,"50,000",low
+Telecommunications Technician,"50,000",low
+Umpire,"50,000",low
+Wrestler,"50,000",low
+Electrician,"49,840",low
+Foreign Missionary,"49,800",low
+Theatre Director,"49,690",low
+Curator,"49,590",low
+Jewelry Designer,"49,345",low
+Plumber,"49,140",low
+Magician,"49,000",low
+Pesticide Scientist,"49,000",low
+Music Producer,"48,900",low
+Pet Sitter,"48,640",low
+Event Promoter,"48,360",low
+Insurance Sales Agent,"48,150",low
+Air Tanker Pilot,"48,000",low
+Demolition Contractor,"48,000",low
+Interior Designer,"47,600",low
+Headhunter,"47,500",low
+Orchestra Conductor,"47,350",low
+Hair Designer,"47,210",low
+Makeup Designer,"47,210",low
+Chef,"47,000",low
+Paralegal,"46,990",low
+Production Sound Mixer,"46,870",low
+Funeral Director,"46,840",low
+Marriage and Family Therapist,"46,670",low
+Advertising Sales Representative,"46,290",low
+Sommelier,"46,260",low
+Exercise Physiologist,"46,020",low
+Auctioneer,"46,000",low
+Audio Engineer,"46,000",low
+Floriculturist,"46,000",low
+Commercial Diver,"45,890",low
+Hospice Worker,"45,760",low
+Private Detective,"45,740",low
+Fire Fighter,"45,250",low
+Embalmer,"45,060",low
+Antiques Dealer,"45,000",low
+Cartoonist,"45,000",low
+Dredge Operator,"45,000",low
+Music Teacher,"45,000",low
+Music Therapist,"45,000",low
+Nuclear Materials Courier,"45,000",low
+Pyrotechnician,"45,000",low
+Translator,"45,000",low
+Wind Farm Operator,"45,000",low
+Optician,"44,881",low
+Illustrator,"44,850",low
+Sketch Artist,"44,380",low
+Social Worker,"44,200",low
+Graphic Designer,"44,150",low
+Choreographer,"44,130",low
+Liquor Distributor,"44,000",low
+Priest,"43,950",low
+Sculptor,"43,890",low
+Foreign Language Teacher,"43,510",low
+Painter,"42,610",low
+Glazier,"42,500",low
+Car Sales Agent,"42,000",low
+Chauffeur,"42,000",low
+Grant Writer,"42,000",low
+Sales Worker Supervisor,"42,000",low
+Real Estate Broker,"41,990",low
+Grief Counselor,"41,500",low
+Consumer Safety Inspector,"41,000",low
+Machinist,"41,000",low
+Container Ship Sailor,"40,970",low
+Locksmith,"40,620",low
+Horticulturist,"40,470",low
+Cattle Rancher,"40,401",low
+Ballerina,"40,000",low
+Gemologist,"40,000",low
+Opera Singer,"40,000",low
+Rare Book Dealer,"40,000",low
+Carpenter,"39,940",low
+Athletic Coach,"39,590",low
+Musician or Singer,"39,550",low
+Costume Designer,"39,540",low
+Arborist,"39,000",low
+Prison Guard,"38,970",low
+College Admissions Officer,"38,570",low
+Deejay,"38,200",low
+Truck Driver,"38,200",low
+Gun Store Owner,"38,000",low
+Horologist,"38,000",low
+Matchmaker,"38,000",low
+TV Reporter,"37,674",low
+Stonemason,"37,350",low
+Flight Attendant,"37,240",low
+Auto Mechanic,"37,000",low
+Baggage Handler,"37,000",low
+Bailiff,"37,000",low
+Computer Repair Technician,"36,620",low
+Welder,"36,395",low
+Clown,"36,000",low
+Massage Therapist,"35,970",low
+Newspaper Reporter,"35,870",low
+Roofer,"35,800",low
+Journalist,"35,600",low
+Adminstrative Assistant,"35,330",low
+Bookkeeper,"35,170",low
+Brewer,"35,000",low
+Fish Hatchery Worker,"35,000",low
+Poet,"35,000",low
+Travel Agent,"34,600",low
+Dental Assistant,"34,500",low
+Animal Control Worker,"34,370",low
+Endoscopy Technician,"34,078",low
+Bus Driver,"34,000",low
+Tractor Operator,"34,000",low
+MMA Fighter,"34,000",low
+Medical Transcriptionist,"34,000",low
+Spa Manager,"34,000",low
+Toll Booth Operator,"34,000",low
+Yoga Instructor,"34,000",low
+Park Ranger,"33,890",low
+Rehabilitation Counselor,"33,880",low
+Fisherman,"33,430",low
+Upholsterer,"33,280",low
+Sports Camera Operator,"33,130",low
+Customer Service Rep,"33,000",low
+Hunter,"33,000",low
+Repo Man,"32,480",low
+Wedding Planner,"32,000",low
+Fitness Instructor,"31,720",low
+Personal Trainer,"31,720",low
+Photographer,"31,200",low
+Potter,"31,000",low
+Dancer,"30,720",low
+Dolphin Trainer,"30,000",low
+Furniture Salesman,"30,000",low
+Gymnast,"30,000",low
+Glass Blower,"29,790",low
+Amusement Arcade Worker,"29,770",low
+Phlebotomist,"29,730",low
+Substitute Teacher,"29,600",low
+Medical Assistant,"29,370",low
+Pharmacy Technician,"29,000",low
+Butcher,"28,660",low
+Esthetician,"28,640",low
+Furniture Maker,"28,440",low
+Woodworker,"28,440",low
+Daycare Worker,"28,377",low
+Tailor,"28,000",low
+Preschool Teacher,"27,130",low
+Sanitation Worker,"27,000",low
+Bartender,"26,000",low
+Gardener,"26,000",low
+Zookeeper,"26,000",low
+Animal Trainer,"25,270",low
+Beautician,"25,000",low
+Cosmetologist,"25,000",low
+Bike Messenger,"25,000",low
+Mall Cop,"25,000",low
+SCUBA Instructor,"25,000",low
+Tea Plantation Owner,"25,000",low
+Florist,"24,750",low
+Orderly,"23,990",low
+Security Guard,"23,970",low
+Landscaper,"23,940",low
+Tour Guide,"23,770",low
+Baker,"23,140",low
+Taxi Driver,"22,820",low
+Janitor,"22,320",low
+Barista,"22,000",low
+Manicurist,"22,000",low
+Swimming Instructor,"22,000",low
+Bookie,"21,810",low
+Bellboy,"21,000",low
+Usher,"20,608",low
+Lifeguard,"20,268",low
+Vegas Dealer,"20,210",low
+Nanny,"20,000",low
+Figure Skater,"20,000",low
+Jockey,"20,000",low
+Mall Kiosk Worker,"20,000",low
+Rock Star,"20,000",low
+Stand-up Comedian,"20,000",low
+Wildlife Rescuer,"20,000",low
+Pet Groomer,"19,910",low
+Housekeeper,"19,570",low
+Cashier,"18,970",low
+Waiter,"18,540",low
+Greenskeeper,"18,000",low
+Poker Player,"15,000",low
+Mystery Shopper,"14,000",low
+Crossword Puzzle Writer,"10,000",low
+Mall Santa,"9,000",low
+Cheerleader,"3,000",low
+Camp Counselor,"1,880",low
+Greeting Card Writer,"1,500",low
+YouTube Personality,100,low
+Nun,0,low
+Monk,0,low

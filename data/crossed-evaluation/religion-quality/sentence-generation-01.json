@@ -1,11 +1,11 @@
 {
     "protected-words": {
         "type": "file",
-        "data": "data/protected-p/religion/words-01.csv"
+        "data": "data/properties/religion/words-01.csv"
     },
     "stereotyped-words": {
         "type": "file",
-        "data": "data/stereotyped-p/quality/words-01.csv"
+        "data": "data/properties/quality/words-01.csv"
     },
     "templates": {
         "type": "file",

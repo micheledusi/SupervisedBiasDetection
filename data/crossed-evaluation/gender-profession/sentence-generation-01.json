@@ -12,7 +12,7 @@
     },
     "stereotyped-words": {
         "type": "file",
-        "data": "data/stereotyped-p/profession/words-01.csv"
+        "data": "data/properties/profession/words-01.csv"
     },
     "templates": {
         "type": "file",

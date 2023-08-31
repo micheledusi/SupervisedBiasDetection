@@ -23,8 +23,6 @@ from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.config import Configurations, ConfigurationsGrid, Parameter
 
-PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 1)
-
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
@@ -33,7 +31,6 @@ configurations = ConfigurationsGrid({
 	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
 })
 
-MIDSTEP: int = 54								# A single midstep value for which the reduced embeddings will be saved
 MIDSTEPS: list[int] = list(range(2, 768+1))		# The list of midstep values for which the separation metrics will be computed
 
 # Separation metrics constants:
@@ -51,7 +48,7 @@ class SeparationExperiment(Experiment):
 	"""
 
 	def __init__(self) -> None:
-		super().__init__("separation measurement")
+		super().__init__("separation measurement", required_kwargs=['prot_prop', 'midstep'])
 		self._distance_fn = None
 	
 	def _execute(self, **kwargs) -> None:
@@ -60,7 +57,7 @@ class SeparationExperiment(Experiment):
 		datasets.disable_progress_bar()
 
 		for configs in configurations:
-			embeddings_ds: Dataset = Experiment._get_property_embeddings(PROTECTED_PROPERTY, configs)
+			embeddings_ds: Dataset = Experiment._get_property_embeddings(self.protected_property, configs)
 			embeddings_ds = embeddings_ds.remove_columns(['descriptor','tokens'])
 			embeddings_ds = embeddings_ds.add_column('labeled_value', embeddings_ds['value'])
 			embeddings_ds = embeddings_ds.class_encode_column('labeled_value')
@@ -80,19 +77,17 @@ class SeparationExperiment(Experiment):
 
 			### [1] 
 			# We apply the dimensionality reduction step:
-			reduced_embeddings_ds: Dataset = self._reduce(configs, MIDSTEP, embeddings_ds)
+			reduced_embeddings_ds: Dataset = self._reduce(configs, self.midstep, embeddings_ds)
 
 			# We also log the reduced dataset to a file
 			# If the directory does not exist, it will be created
-			folder: str = f'results/{PROTECTED_PROPERTY.name}'
-			if not os.path.exists(folder):
-				os.makedirs(folder)
+			folder: str = self._get_results_folder(configs, embeddings_ds)
 			configs_descriptor: str = configs.to_abbrstr()
 			# We split the coordinates in two columns
 			printable_ds: Dataset = reduced_embeddings_ds.add_column('x', reduced_embeddings_ds['embedding'][:, 0].tolist())
 			printable_ds = printable_ds.add_column('y', reduced_embeddings_ds['embedding'][:, 1].tolist())
 			printable_ds = printable_ds.remove_columns('embedding')
-			printable_ds.to_csv(folder + f'/reduced_embs_{configs_descriptor}_N{MIDSTEP}.csv', index=False)
+			printable_ds.to_csv(folder + f'/reduced_embs_{configs_descriptor}_N{self.midstep}.csv', index=False)
 
 			### [2] 
 			# We compute the separation metrics:

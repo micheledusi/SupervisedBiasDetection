@@ -1,11 +1,11 @@
 {
     "protected-words": {
         "type": "file",
-        "data": "data/protected-p/ethnicity/words-01.csv"
+        "data": "data/properties/ethnicity/words-01.csv"
     },
     "stereotyped-words": {
         "type": "file",
-        "data": "data/stereotyped-p/criminality/words-01.csv"
+        "data": "data/properties/criminality/words-01.csv"
     },
     "templates": {
         "type": "file",

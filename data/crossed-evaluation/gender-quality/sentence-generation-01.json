@@ -14,7 +14,7 @@
     },
     "stereotyped-words": {
         "type": "file",
-        "data": "data/stereotyped-p/quality/words-01.csv"
+        "data": "data/properties/quality/words-01.csv"
     },
     "templates": {
         "type": "file",

@@ -36,16 +36,13 @@ configurations = ConfigurationsGrid({
 })
 
 MIDSTEPS: list[int] = list(range(2, 768+1))
-
-PROTECTED_PROPERTY = PropertyDataReference("religion", "protected", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
 BIAS_GENERATION_ID = 1
 
 
 class MidstepAnalysisChiSquared(Experiment):
 
 	def __init__(self) -> None:
-		super().__init__("midstep analysis with chi squared")
+		super().__init__("midstep analysis with chi squared", required_kwargs=['prot_prop', 'ster_prop'])
 
 	def _execute(self, **kwargs) -> None:
 		results: Dataset = Dataset.from_dict({"n": MIDSTEPS})
@@ -55,7 +52,7 @@ class MidstepAnalysisChiSquared(Experiment):
 			print("Current parameters configuration:\n", configs, '\n')
 			
 			# Getting the embeddings
-			prot_dataset, ster_dataset = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
+			prot_dataset, ster_dataset = self._get_embeddings(configs)
 			
 			# Centering (optional)
 			if configs[Parameter.CENTER_EMBEDDINGS]:
@@ -99,9 +96,7 @@ class MidstepAnalysisChiSquared(Experiment):
 			results = results.add_column(f"p_value_{configs.subget_mutables().to_abbrstr()}", p_values)
 
 		# Save the results
-		folder = f"results/{PROTECTED_PROPERTY.name}-{STEREOTYPED_PROPERTY.name}"
-		if not os.path.exists(folder):
-			os.makedirs(folder)
+		folder: str = self._get_results_folder(configs, prot_dataset, ster_dataset)
 		# The filename will contain the IMMUTABLE parameters in the configuration, i.e.
 		# the parameters that cannot change from one experiment to another.
 		filename = f"aggregated_midstep_chi_squared_{configs.subget_immutables().to_abbrstr()}.csv"

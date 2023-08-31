@@ -1,0 +1,7 @@
+template
+"My cousin is [WORD:adj]."
+"That's your [WORD:adj] neighbor."
+"My [WORD:adj] friend is coming over."
+"They're just a [WORD:noun]."
+"I'm a [WORD:noun]."
+"You're a [WORD:noun]."

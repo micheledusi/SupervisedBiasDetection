@@ -25,9 +25,6 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-PROTECTED_PROPERTY = PropertyDataReference("gender", "protected", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", "stereotyped", 1, 1)
-
 configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
@@ -35,8 +32,6 @@ configs = Configurations({
 	Parameter.REDUCTION_TYPE: 'pca',
 	Parameter.CENTER_EMBEDDINGS: False,
 })
-
-MIDSTEP: int = 200
 
 
 class DimensionalityReductionExperiment(Experiment):
@@ -55,12 +50,12 @@ class DimensionalityReductionExperiment(Experiment):
 	"""
 
 	def __init__(self) -> None:
-		super().__init__("dimensionality reduction")
+		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'])
 
 	def _execute(self, **kwargs) -> None:
 		
 		# Getting embeddings
-		prot_dataset, ster_dataset = Experiment._get_embeddings(PROTECTED_PROPERTY, STEREOTYPED_PROPERTY, configs)
+		prot_dataset, ster_dataset = Experiment._get_embeddings(self.protected_property, self.stereotyped_property, configs)
 		
 		# Centering (optional)
 		if configs[Parameter.CENTER_EMBEDDINGS]:
@@ -80,7 +75,7 @@ class DimensionalityReductionExperiment(Experiment):
 		# 1. Reduction based on the weights of the classifier
 		classifier: AbstractClassifier = ClassifierFactory.create(configs)
 		classifier.train(prot_dataset)
-		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=MIDSTEP)
+		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=self.midstep)
 		reduced_midstep_prot_embs = reducer_1.reduce(prot_embs)
 
 		# 2. Reduction based on PCA / t-SNE
@@ -88,7 +83,7 @@ class DimensionalityReductionExperiment(Experiment):
 		if configs[Parameter.REDUCTION_TYPE] == 'pca':
 			reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_midstep_prot_embs, output_features=2)
 		elif configs[Parameter.REDUCTION_TYPE] == 'tsne':
-			reducer_2: TSNEReducer = TSNEReducer(input_features=MIDSTEP, output_features=2)
+			reducer_2: TSNEReducer = TSNEReducer(input_features=self.midstep, output_features=2)
 		else:
 			raise ValueError(f"Invalid reduction type: {configs[Parameter.REDUCTION_TYPE]}")
 		
@@ -149,29 +144,27 @@ class DimensionalityReductionExperiment(Experiment):
 			})
 
 		# If the directory does not exist, it will be created
-		folder: str = f'results/{PROTECTED_PROPERTY.name}-{STEREOTYPED_PROPERTY.name}'
-		if not os.path.exists(folder):
-			os.makedirs(folder)
+		folder: str = self._get_results_folder(configs, prot_dataset, ster_dataset)
 		configs_descriptor: str = configs.to_abbrstr()
-		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{MIDSTEP}.csv', index=False)
+		results_ds.to_csv(folder + f'/reduced_data_{configs_descriptor}_N{self.midstep}.csv', index=False)
 
 		# Chi-squared test
 		chi2 = ChiSquaredTest(verbose=True)
 		filter_ster = lambda x: x['type'] == 'stereotyped'
 		print("Original predictions, for N = 768:")
 		original_chi_sq, original_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'original_predicted_protected_value')
-		print(f"Midstep predictions, for N = {MIDSTEP}:")
+		print(f"Midstep predictions, for N = {self.midstep}:")
 		midstep_chi_sq, midstep_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'midstep_predicted_protected_value')
 		print("Reduced predictions, for N = 2:")
 		reduced_chi_sq, reduced_p_value = chi2.test(results_ds.filter(filter_ster), 'value', 'reduced_predicted_protected_value')
 
 		print("Compared results:")
-		print(f"Classification in the ORIGINAL embeddings:       p-value = {original_p_value:10.8f}     chi-squared = {original_chi_sq:10.8f}")
-		print(f"Classification in the MIDSTEP  embeddings:       p-value = { midstep_p_value:10.8f}     chi-squared = { midstep_chi_sq:10.8f}")
-		print(f"Classification in the REDUCED  embeddings:       p-value = { reduced_p_value:10.8f}     chi-squared = { reduced_chi_sq:10.8f}")
+		print(f"Classification in the ORIGINAL embeddings:       p-value = {original_p_value:8.5e}     chi-squared = {original_chi_sq:10.8f}")
+		print(f"Classification in the MIDSTEP  embeddings:       p-value = { midstep_p_value:8.5e}     chi-squared = { midstep_chi_sq:10.8f}")
+		print(f"Classification in the REDUCED  embeddings:       p-value = { reduced_p_value:8.5e}     chi-squared = { reduced_chi_sq:10.8f}")
 		print("(The lower the p-value, the higher the probability that the embeddings are stereotyped)\n")
 		
-		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {MIDSTEP}, confidence = {100 - midstep_p_value*100:10.8f}%)", color_col='value').show()
+		ScatterPlotter(results_ds, title=f"Reduced Embeddings (N = {self.midstep}, confidence = {100 - midstep_p_value*100:10.8f}%)", color_col='value').show()
 
 		# Printing the result file path
-		print("\nResults saved to CSV file:", folder + f'/reduced_data_{configs_descriptor}_N{MIDSTEP}.csv\n')
+		print("\nResults saved to CSV file:", folder + f'/reduced_data_{configs_descriptor}_N{self.midstep}.csv\n')
