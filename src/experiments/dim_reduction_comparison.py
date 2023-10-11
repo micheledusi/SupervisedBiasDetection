@@ -51,7 +51,7 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 	def _execute(self, **kwargs) -> None:
 
 		# Getting embeddings
-		prot_dataset, ster_dataset = Experiment._get_embeddings(self.protected_property, self.stereotyped_property, configs)
+		prot_dataset, ster_dataset = self._get_embeddings(configs)
 		
 		# Centering (optional)
 		if configs[Parameter.CENTER_EMBEDDINGS]:

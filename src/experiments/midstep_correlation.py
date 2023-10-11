@@ -13,6 +13,7 @@
 
 import os
 from datasets import Dataset
+import numpy as np
 import torch
 from torchmetrics import PearsonCorrCoef
 
@@ -219,11 +220,13 @@ class MidstepAnalysisCorrelation(Experiment):
 		first_prot_value_polar = min(sp_polar)
 		second_prot_value_polar = max(sp_polar)
 
+		""" OLD VERSION
 		pp_polar = list(map(lambda val: 
 		 	first_prot_value_polar if val == first_prot_value 
 		 	else second_prot_value_polar if val == second_prot_value
 			else None,  
-			prot_dataset['value']))
+			prot_dataset['value'])) """
+		pp_polar = [np.mean(sp_polar)] * len(prot_dataset['value'])
 		
 		polarizations = sp_polar + pp_polar
 		types = ['stereotyped'] * len(sp_polar) + ['protected'] * len(pp_polar)
@@ -251,7 +254,7 @@ class MidstepAnalysisCorrelation(Experiment):
 		plot_results = Dataset.from_dict({
 			"word": words,
 			"value": values,
-			'property': types,
+			'type': types,
 			"x": first_coord, 
 			"y": second_coord,
 			"polarization": polarizations
