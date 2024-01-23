@@ -9,6 +9,7 @@
 # used in the project, based on some naming conventions.
 
 from utils.caching.creation import BiasDataReference
+from utils.config import Configurations, Parameter
 from utils.const import *
 
 
@@ -32,3 +33,7 @@ def get_file_desinence(id: int) -> str:
 def get_crossed_evaluation_generation_file(bias_reference: BiasDataReference) -> str:
     inner_folder: str = f"{bias_reference.protected_property.name}-{bias_reference.stereotyped_property.name}"
     return FOLDER_CROSSED_EVALUATION + "/" + inner_folder + "/" + FILE_GENERATION + get_file_desinence(bias_reference.generation_id) + ".json"
+
+
+def get_model_results_folder(configs: Configurations) -> str:
+    return f"{FOLDER_RESULTS}/{configs[Parameter.MODEL_NAME]}"

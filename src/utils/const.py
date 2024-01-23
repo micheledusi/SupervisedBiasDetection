@@ -12,6 +12,7 @@ import torch
 # Filename and folder conventions
 # All paths are relative to the root of the project.
 FOLDER_DATA: str = "data"
+FOLDER_RESULTS: str = "results"
 FOLDER_CROSSED_EVALUATION: str = FOLDER_DATA + "/crossed-evaluation"
 FOLDER_PROTECTED_PROPERTY: str = FOLDER_DATA + "/protected-p"
 FOLDER_STEREOTYPED_PROPERTY: str = FOLDER_DATA + "/stereotyped-p"
@@ -34,7 +35,10 @@ TOKEN_SEP: str = "[SEP]"
 TOKEN_MASK: str = "[MASK]"
 
 # Bert model name
-DEFAULT_BERT_MODEL_NAME: str = "bert-base-uncased"
+MODEL_NAME_BERT_BASE_UNCASED: str = "bert-base-uncased"
+MODEL_NAME_ROBERTA_BASE: str = "roberta-base"
+MODEL_NAME_DISTILBERT_BASE_UNCASED: str = "distilbert-base-uncased"
+DEFAULT_MODEL_NAME: str = MODEL_NAME_BERT_BASE_UNCASED
 
 # Configurations
 NUM_PROC: int = 1

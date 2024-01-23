@@ -10,8 +10,8 @@ from transformers import AutoModelForMaskedLM
 from model.binary_scoring.crossing.base import CrossingScorer
 
 
-from utils.config import Configurations
-from utils.const import DEFAULT_BERT_MODEL_NAME, DEVICE
+from utils.config import Configurations, Parameter
+from utils.const import DEVICE
 
 
 IGNORE_INDEX: int = -100
@@ -39,7 +39,8 @@ class PPPLCrossScorer(CrossingScorer):
 	def __init__(self, configs: Configurations):
 		super().__init__(configs)
 		# Getting the model
-		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME)
+		model_name: str = configs[Parameter.MODEL_NAME]
+		self.model = AutoModelForMaskedLM.from_pretrained(model_name)
 		self.model.to(DEVICE)
 	
 	def _compute_pppl(self, sentence: torch.Tensor) -> float:

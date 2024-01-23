@@ -100,8 +100,9 @@ class WordEmbedder:
 		self.discard_longer_words = configs.get(Parameter.DISCARD_LONGER_WORDS, DEFAULT_DISCARD_LONGER_WORDS)
 
 		# The model used to extract the embeddings
-		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModel.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
+		model_name: str = configs[Parameter.MODEL_NAME]
+		self.tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=True)	# The tokenizer must be initialized with the "add_prefix_space", specifically for the RoBERTa model. In this case, in fact, the tokenizer will tokenize differently the words at the beginning of each sentence.
+		self.model = AutoModel.from_pretrained(model_name).to(DEVICE)
 
 	def get_tokens_number(self, word: str) -> int:
 		"""
@@ -121,15 +122,16 @@ class WordEmbedder:
 		steps = array.shape[-1] - window_len + 1
 		# Unfold the last dimension of the array into 2 dimension of length [len(array) - window_len + 1, window_len]
 		unfolded_array = array.unfold(dimension=-1, size=window_len, step=1).to(DEVICE)
-		# print("Unfolded array shape:", unfolded_array.shape)
+		#print("Unfolded array shape:", unfolded_array.shape)
 		# Repeat the subarray to match the shape of the unfolded array
 		repeated_subarray = subarray.unsqueeze(0).repeat(steps, 1).to(DEVICE)
-		# print("Repeated subarray shape:", repeated_subarray.shape)
+		#print("Repeated subarray shape:", repeated_subarray.shape)
 		# Both arrays have the same shape now
 		# Shape = [#sentences_padded_tokens, #word_tokens]
 		# Compare the two arrays:
 		comparison = torch.all(unfolded_array == repeated_subarray, dim=-1).to(DEVICE)
-		# print("Comparison shape:", comparison.shape)
+		#print("Comparison shape:", comparison.shape)
+		# Get the first occurrence index
 		first_occurrence_index = int(torch.where(comparison == True)[0])
 		# We get to a single scalar
 		# Now we repeat the first occurrence index (increasing it) for each element of the subarray

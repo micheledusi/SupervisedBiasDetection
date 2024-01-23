@@ -17,6 +17,7 @@ class Parameter(Enum):
 	"""
 	This class represents a parameter.
 	"""
+	MODEL_NAME = "model_name", DEFAULT_MODEL_NAME, "MODEL"
 	TEMPLATES_SELECTED_NUMBER = "templates_selected_number", DEFAULT_TEMPLATES_SELECTED_NUMBER, "TM"
 	AVERAGE_TEMPLATES = "average_templates", DEFAULT_AVERAGE_TEMPLATES
 	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TK"

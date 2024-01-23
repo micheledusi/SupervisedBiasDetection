@@ -29,8 +29,9 @@ class MLMPredictor:
 	__softmax = torch.nn.Softmax(dim=-1)
 
 	def __init__(self, configs: Configurations) -> None:
-		self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BERT_MODEL_NAME)
-		self.model = AutoModelForMaskedLM.from_pretrained(DEFAULT_BERT_MODEL_NAME).to(DEVICE)
+		model_name: str = configs[Parameter.MODEL_NAME]
+		self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+		self.model = AutoModelForMaskedLM.from_pretrained(model_name).to(DEVICE)
 		
 		# The maximum number of tokens to consider/retain for the word
 		arg_tkns = configs.get(Parameter.MAX_TOKENS_NUMBER, DEFAULT_MAX_TOKENS_NUMBER)

@@ -15,6 +15,7 @@ from datasets import Dataset
 
 from utils.caching.creation import PropertyDataReference, get_cached_embeddings
 from utils.config import Configurations
+from utils import file_system as fs
 
 REBUILD = False
 
@@ -202,7 +203,7 @@ class Experiment:
 			ster_str: str = self.stereotyped_property.name_with_classes_number(ster_values)
 			properties_strings.append(ster_str)
 
-		folder: str = f"results/{'-'.join(properties_strings)}"
+		folder: str = f"{fs.get_model_results_folder(configs)}/{'-'.join(properties_strings)}"
 
 		if not os.path.exists(folder):
 			os.makedirs(folder)

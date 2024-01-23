@@ -32,6 +32,7 @@ class CachedDataType(Enum):
 		PickleFileStream
 	EMBEDDINGS = "embeddings", \
 		(
+			Parameter.MODEL_NAME,
 			Parameter.TEMPLATES_SELECTED_NUMBER,
 			Parameter.AVERAGE_TEMPLATES,
 			Parameter.AVERAGE_TOKENS,
@@ -41,6 +42,7 @@ class CachedDataType(Enum):
 		JSONFileStream, EmbeddingsJSONConverter
 	CROSSING_SCORES = "crossing_scores", \
 		(
+			Parameter.MODEL_NAME,
 			Parameter.DISCARD_LONGER_WORDS,
 			Parameter.MAX_TOKENS_NUMBER,
 			Parameter.CROSSING_STRATEGY,
@@ -48,6 +50,7 @@ class CachedDataType(Enum):
 		JSONFileStream, CrossingScoresJSONConverter
 	POLARIZATION_SCORES = "polarization_scores", \
 		(
+			Parameter.MODEL_NAME,
 			Parameter.DISCARD_LONGER_WORDS,
 			Parameter.MAX_TOKENS_NUMBER,
 			Parameter.CROSSING_STRATEGY,
