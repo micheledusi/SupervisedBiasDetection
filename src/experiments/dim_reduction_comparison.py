@@ -24,16 +24,6 @@ from model.reduction.weights import WeightsSelectorReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
-from view.plotter.scatter import ScatterPlotter
-
-configs = Configurations({
-	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
-	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.REDUCTION_TYPE: 'pca',
-	Parameter.CENTER_EMBEDDINGS: False,
-})
-
 
 
 class DimensionalityReductionsComparisonExperiment(Experiment):
@@ -45,17 +35,17 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 	Notice that the embeddings can be reduced to various numbers of dimensions, depending on the reduction method.
 	"""
 
-	def __init__(self) -> None:
-		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'])
+	def __init__(self, configs: Configurations) -> None:
+		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'], configs=configs)
 
 	def _execute(self, **kwargs) -> None:
 
 		# Getting embeddings
-		prot_dataset, ster_dataset = self._get_embeddings(configs)
+		prot_dataset, ster_dataset = self._get_embeddings(self.configs)
 		
 		# Centering (optional)
-		if configs[Parameter.CENTER_EMBEDDINGS]:
-			centerer: EmbeddingCenterer = EmbeddingCenterer(configs)
+		if self.configs[Parameter.CENTER_EMBEDDINGS]:
+			centerer: EmbeddingCenterer = EmbeddingCenterer(self.configs)
 			prot_dataset = centerer.center(prot_dataset)
 			ster_dataset = centerer.center(ster_dataset)
 
@@ -71,7 +61,7 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		# We start defining reducers to be compared
 		reducers: list[BaseDimensionalityReducer] = []
 		# Some of them will require a classifier trained on the protected property, thus we prepare it
-		classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
 		classifier.train(prot_dataset)
 
 		# 0. No reduction: 768 --> 768
@@ -115,7 +105,7 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 			reduced_ster_embs_ds: Dataset = Dataset.from_dict({'embedding': reduced_ster_embs, 'value': ster_dataset['value']}).with_format('torch')
 
 			# Training a new classifier on the reduced embeddings
-			reduced_classifier: AbstractClassifier = ClassifierFactory.create(configs)
+			reduced_classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
 			reduced_classifier.train(reduced_prot_embs_ds)
 
 			# Predicting the values with the classifier
@@ -150,10 +140,10 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		:param embeddings: The embeddings at the input of the reducer.
 		:return: A "classic" reducer.
 		"""
-		if configs[Parameter.REDUCTION_TYPE] == 'pca':
+		if self.configs[Parameter.REDUCTION_TYPE] == 'pca':
 			return TrainedPCAReducer(embeddings, output_features=out_dim)
-		elif configs[Parameter.REDUCTION_TYPE] == 'tsne':
+		elif self.configs[Parameter.REDUCTION_TYPE] == 'tsne':
 			in_dim = embeddings.shape[-1]
 			return TSNEReducer(input_features=in_dim, output_features=out_dim)
 		else:
-			raise ValueError(f"Invalid reduction type: {configs[Parameter.REDUCTION_TYPE]}")
+			raise ValueError(f"Invalid reduction type: {self.configs[Parameter.REDUCTION_TYPE]}")

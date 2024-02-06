@@ -28,16 +28,22 @@ class Experiment:
 	"""
 	The base class for the experiments.
 	"""
-	def __init__(self, name: str, required_kwargs: list[str] = []):
+	def __init__(self, name: str, required_kwargs: list[str] = [], configs: Configurations = None):
 		"""
 		The initializer for the experiment class.
 
 		:param name: The name of the experiment.
 		:param required_kwargs: The list of required arguments to pass to the run method. If not specified, the run method will accept any argument.
 		If specified, the run method will require the given arguments to work properly.
+		:param configs: The configurations to use for the experiment.
 		"""
 		self._name = name
 		self.__required_kwargs = required_kwargs
+		self.__configs = configs
+
+		# Check if the given configurations are valid
+		if self.__configs is not None and not isinstance(self.__configs, Configurations):
+			raise ValueError("The given configurations are not valid. Please provide a valid instance of Configurations.")
 		
 		# Setup contestual properties
 		# These properties are used by the subclasses to perform the experiment, and are available only during the execution.
@@ -57,6 +63,15 @@ class Experiment:
 		:return: The name of the experiment.
 		"""
 		return self._name
+	
+	@property
+	def configs(self) -> Configurations:
+		"""
+		The configurations used for the experiment.
+
+		:return: The configurations to use for the experiment, as instance of class `Configurations`.
+		"""
+		return self.__configs
 	
 	@property
 	def protected_property(self) -> PropertyDataReference:

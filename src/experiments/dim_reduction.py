@@ -25,13 +25,6 @@ from model.reduction.tsne import TSNEReducer
 from utils.config import Configurations, Parameter
 from view.plotter.scatter import ScatterPlotter
 
-configs = Configurations({
-	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
-	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.REDUCTION_TYPE: 'pca',
-	Parameter.CENTER_EMBEDDINGS: False,
-})
 
 OUTPUT_NAME_REDUCED_EMBEDDINGS = "reduced_embeddings_classification"
 
@@ -51,17 +44,17 @@ class DimensionalityReductionExperiment(Experiment):
 	In this experiment, the embeddings are reduced to 2 dimensions.
 	"""
 
-	def __init__(self) -> None:
-		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'])
+	def __init__(self, configs: Configurations) -> None:
+		super().__init__("dimensionality reduction", required_kwargs=['prot_prop', 'ster_prop', 'midstep'], configs=configs)
 
 	def _execute(self, **kwargs) -> None:
 		
 		# Getting embeddings
-		prot_dataset, ster_dataset = self._get_embeddings(configs)
+		prot_dataset, ster_dataset = self._get_embeddings(self.configs)
 		
 		# Centering (optional)
-		if configs[Parameter.CENTER_EMBEDDINGS]:
-			centerer: EmbeddingCenterer = EmbeddingCenterer(configs)
+		if self.configs[Parameter.CENTER_EMBEDDINGS]:
+			centerer: EmbeddingCenterer = EmbeddingCenterer(self.configs)
 			prot_dataset = centerer.center(prot_dataset)
 			ster_dataset = centerer.center(ster_dataset)
 
@@ -75,19 +68,19 @@ class DimensionalityReductionExperiment(Experiment):
 		print(f"({num_prot} protected words + {num_ster} stereotyped words = {num_prot + num_ster} total words)")
 
 		# 1. Reduction based on the weights of the classifier
-		classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
 		classifier.train(prot_dataset)
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=self.midstep)
 		reduced_midstep_prot_embs = reducer_1.reduce(prot_embs)
 
 		# 2. Reduction based on PCA / t-SNE
 		reducer_2 = None
-		if configs[Parameter.REDUCTION_TYPE] == 'pca':
+		if self.configs[Parameter.REDUCTION_TYPE] == 'pca':
 			reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_midstep_prot_embs, output_features=2)
-		elif configs[Parameter.REDUCTION_TYPE] == 'tsne':
+		elif self.configs[Parameter.REDUCTION_TYPE] == 'tsne':
 			reducer_2: TSNEReducer = TSNEReducer(input_features=self.midstep, output_features=2)
 		else:
-			raise ValueError(f"Invalid reduction type: {configs[Parameter.REDUCTION_TYPE]}")
+			raise ValueError(f"Invalid reduction type: {self.configs[Parameter.REDUCTION_TYPE]}")
 		
 		# Combining the two reducers
 		reducer = CompositeReducer([
@@ -111,7 +104,7 @@ class DimensionalityReductionExperiment(Experiment):
 		predicted_values: list[str] = [classifier.classes[p] for p in predictions]
 
 		# Trying to predict the protected property with a new classifier, trained on the midstep-reduced embeddings
-		midstep_classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		midstep_classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
 		midstep_prot_dataset: Dataset = Dataset.from_dict({'embedding': reduced_midstep_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
 		midstep_ster_dataset: Dataset = Dataset.from_dict({'embedding': reducer_1.reduce(ster_embs), 'value': ster_dataset['value']}).with_format('torch')
 		midstep_classifier.train(midstep_prot_dataset)
@@ -121,7 +114,7 @@ class DimensionalityReductionExperiment(Experiment):
 		midstep_predicted_values: list[str] = [midstep_classifier.classes[p] for p in midstep_predictions]
 
 		# Trying to predict the protected property with a new classifier, trained on the reduced embeddings
-		reduced_classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		reduced_classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
 		reduced_prot_dataset: Dataset = Dataset.from_dict({'embedding': reduced_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
 		reduced_ster_dataset: Dataset = Dataset.from_dict({'embedding': reduced_ster_embs, 'value': ster_dataset['value']}).with_format('torch')
 		reduced_classifier.train(reduced_prot_dataset)
@@ -146,8 +139,8 @@ class DimensionalityReductionExperiment(Experiment):
 			})
 
 		# If the directory does not exist, it will be created
-		folder: str = self._get_results_folder(configs, prot_dataset, ster_dataset)
-		configs_descriptor: str = configs.to_abbrstr()
+		folder: str = self._get_results_folder(self.configs, prot_dataset, ster_dataset)
+		configs_descriptor: str = self.configs.to_abbrstr()
 		filename: str = OUTPUT_NAME_REDUCED_EMBEDDINGS + f"_{configs_descriptor}_N{self.midstep}.csv"
 		results_ds.to_csv(folder + '/' + filename, index=False)
 

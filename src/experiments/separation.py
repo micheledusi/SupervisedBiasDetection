@@ -14,28 +14,20 @@ import datasets
 import torch
 from tqdm import tqdm
 
-from data_processing.data_reference import PropertyDataReference
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.factory import ClassifierFactory
 from model.embedding.center import EmbeddingCenterer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.config import Configurations, ConfigurationsGrid, Parameter
-
-configurations = ConfigurationsGrid({
-	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
-	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.CENTER_EMBEDDINGS: False,
-	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
-})
+from utils.config import Configurations, Parameter
 
 MIDSTEPS: list[int] = list(range(2, 768+1))		# The list of midstep values for which the separation metrics will be computed
 
 # Separation metrics constants:
 ALPHA_SEPARATION_COEFFICIENT: float = 1.0
 BETA_COMPACTNESS_COEFFICIENT: float = 1.0
+
 
 class SeparationExperiment(Experiment):
 	"""
@@ -47,8 +39,8 @@ class SeparationExperiment(Experiment):
 	The final score is the ratio between the two.
 	"""
 
-	def __init__(self) -> None:
-		super().__init__("separation measurement", required_kwargs=['prot_prop', 'midstep'])
+	def __init__(self, configs: Configurations) -> None:
+		super().__init__("separation measurement", required_kwargs=['prot_prop', 'midstep'], configs=configs)
 		self._distance_fn = None
 	
 	def _execute(self, **kwargs) -> None:
@@ -56,71 +48,70 @@ class SeparationExperiment(Experiment):
 		datasets.disable_caching()
 		datasets.disable_progress_bar()
 
-		for configs in configurations:
-			embeddings_ds: Dataset = Experiment._get_property_embeddings(self.protected_property, configs)
-			embeddings_ds = embeddings_ds.remove_columns(['descriptor','tokens'])
-			embeddings_ds = embeddings_ds.add_column('labeled_value', embeddings_ds['value'])
-			embeddings_ds = embeddings_ds.class_encode_column('labeled_value')
+		embeddings_ds: Dataset = Experiment._get_property_embeddings(self.protected_property, self.configs)
+		embeddings_ds = embeddings_ds.remove_columns(['descriptor','tokens'])
+		embeddings_ds = embeddings_ds.add_column('labeled_value', embeddings_ds['value'])
+		embeddings_ds = embeddings_ds.class_encode_column('labeled_value')
 
-			if configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'cosine':
-				# We need to center the embeddings
-				if configs[Parameter.CENTER_EMBEDDINGS]:
-					centerer: EmbeddingCenterer = EmbeddingCenterer(configs)
-					embeddings_ds = centerer.center(embeddings_ds)
-				else:
-					raise ValueError("Cosine distance requires centered embeddings.")
-				self._distance_fn = cosine_distance
-			elif configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'euclidean':
-				self._distance_fn = euclidean_distance
+		if self.configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'cosine':
+			# We need to center the embeddings
+			if self.configs[Parameter.CENTER_EMBEDDINGS]:
+				centerer: EmbeddingCenterer = EmbeddingCenterer(self.configs)
+				embeddings_ds = centerer.center(embeddings_ds)
 			else:
-				raise ValueError("Invalid distance strategy.")
+				raise ValueError("Cosine distance requires centered embeddings.")
+			self._distance_fn = cosine_distance
+		elif self.configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'euclidean':
+			self._distance_fn = euclidean_distance
+		else:
+			raise ValueError("Invalid distance strategy.")
 
-			### [1] 
-			# We apply the dimensionality reduction step:
-			reduced_embeddings_ds: Dataset = self._reduce(configs, self.midstep, embeddings_ds)
+		### [1] 
+		# We apply the dimensionality reduction step:
+		reduced_embeddings_ds: Dataset = self._reduce(self.configs, self.midstep, embeddings_ds)
 
-			# We also log the reduced dataset to a file
-			# If the directory does not exist, it will be created
-			folder: str = self._get_results_folder(configs, embeddings_ds)
-			configs_descriptor: str = configs.to_abbrstr()
-			# We split the coordinates in two columns
-			printable_ds: Dataset = reduced_embeddings_ds.add_column('x', reduced_embeddings_ds['embedding'][:, 0].tolist())
-			printable_ds = printable_ds.add_column('y', reduced_embeddings_ds['embedding'][:, 1].tolist())
-			printable_ds = printable_ds.remove_columns('embedding')
-			printable_ds.to_csv(folder + f'/reduced_embs_{configs_descriptor}_N{self.midstep}.csv', index=False)
+		# We also log the reduced dataset to a file
+		# If the directory does not exist, it will be created
+		folder: str = self._get_results_folder(self.configs, embeddings_ds)
+		configs_descriptor: str = self.configs.to_abbrstr()
+		# We split the coordinates in two columns
+		printable_ds: Dataset = reduced_embeddings_ds.add_column('x', reduced_embeddings_ds['embedding'][:, 0].tolist())
+		printable_ds = printable_ds.add_column('y', reduced_embeddings_ds['embedding'][:, 1].tolist())
+		printable_ds = printable_ds.remove_columns('embedding')
+		printable_ds.to_csv(folder + f'/reduced_embs_{configs_descriptor}_N{self.midstep}.csv', index=False)
 
-			### [2] 
-			# We compute the separation metrics:
+		### [2] 
+		# We compute the separation metrics:
+		separation_score: float = self._compute_separation_score(reduced_embeddings_ds, "value", "embedding")
+		compactness_score: float = self._compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
+		score: float = separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT
+		print(f"\nSeparation score: {separation_score}")
+		print(f"Compactness score: {compactness_score}")
+		print(f"\nFinal score: {score}")
+
+		### [3]
+		# In the second part of the experiment, we perform the same analysis over multiple "midstep" values.
+		# We will use the same embeddings, but we will reduce them to different dimensions.
+		scores_sep: list[float] = []
+		scores_comp: list[float] = []
+		scores: list[float] = []
+
+		for n in tqdm(MIDSTEPS):
+			reduced_embeddings_ds: Dataset = self._reduce(self.configs, n, embeddings_ds)
 			separation_score: float = self._compute_separation_score(reduced_embeddings_ds, "value", "embedding")
 			compactness_score: float = self._compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
-			score: float = separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT
-			print(f"\nSeparation score: {separation_score}")
-			print(f"Compactness score: {compactness_score}")
-			print(f"\nFinal score: {score}")
 
-			### [3]
-			# In the second part of the experiment, we perform the same analysis over multiple "midstep" values.
-			# We will use the same embeddings, but we will reduce them to different dimensions.
-			scores_sep: list[float] = []
-			scores_comp: list[float] = []
-			scores: list[float] = []
+			scores_sep.append(separation_score)
+			scores_comp.append(compactness_score)
+			scores.append(separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT)
 
-			for n in tqdm(MIDSTEPS):
-				reduced_embeddings_ds: Dataset = self._reduce(configs, n, embeddings_ds)
-				separation_score: float = self._compute_separation_score(reduced_embeddings_ds, "value", "embedding")
-				compactness_score: float = self._compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
-
-				scores_sep.append(separation_score)
-				scores_comp.append(compactness_score)
-				scores.append(separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT)
-
-			results: Dataset = Dataset.from_dict({
-				"n": MIDSTEPS,
-				"separation": scores_sep,
-				"compactness": scores_comp,
-				"separation_over_compactness": scores,
-				})
-			results.to_csv(folder + f'/separation_scores_{configs_descriptor}.csv', index=False)
+		results: Dataset = Dataset.from_dict({
+			"n": MIDSTEPS,
+			"separation": scores_sep,
+			"compactness": scores_comp,
+			"separation_over_compactness": scores,
+			})
+		results.to_csv(folder + f'/separation_scores_{configs_descriptor}.csv', index=False)
 
 
 	def _compute_separation_score(self, embeddings: Dataset, class_col: str, coords_col: str) -> float:

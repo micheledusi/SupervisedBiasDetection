@@ -29,6 +29,7 @@ from model.reduction.weights import WeightsSelectorReducer
 from utils.caching.creation import get_cached_polarization_scores
 from utils.config import Configurations, ConfigurationsGrid, Parameter
 from utils.const import DEVICE
+from deprecated import deprecated
 
 
 # Configurations to process data
@@ -45,6 +46,7 @@ OUTPUT_NAME_MIDSTEP_ANALYSIS = "aggregated_midstep_correlation"
 OUTPUT_NAME_REDUCED_EMBEDDINGS = "reduced_embeddings_correlation"
 
 
+@deprecated(version='0.1', reason="This experiment is not used anymore.")
 class MidstepAnalysisCorrelation(Experiment):
 
 	def __init__(self) -> None:
