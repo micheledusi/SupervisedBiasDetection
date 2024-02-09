@@ -13,7 +13,7 @@ import os
 import time
 from datasets import Dataset
 
-from utils.caching.creation import PropertyDataReference, get_cached_embeddings
+from utils.caching.creation import PropertyDataReference, get_cached_embeddings, get_cached_raw_embeddings
 from utils.config import Configurations
 from utils import file_system as fs
 
@@ -258,7 +258,8 @@ class Experiment:
 		"""
 		Returns the embeddings for the given property.
 
-		:param kwargs: Additional arguments to pass to the embedding function.
+		:param property: The reference to the property data (name, type, words_file_id, templates_file_id).
+		:param configs: The configurations to use for the experiment.
 		:return: The embeddings for the given property.
 		"""
 		# Extracting data from property object
@@ -268,7 +269,7 @@ class Experiment:
 		# 	templates_file_id: The id of the templates file to use. (e.g. 01, 02, etc.)
 
 		# Retrieving embeddings dataset from cache
-		embeddings: Dataset = get_cached_embeddings(property, configs=configs, rebuild=REBUILD)
+		embeddings: Dataset = get_cached_embeddings(property, configs=configs, bool=REBUILD)
 		squeezed_embs = embeddings['embedding'].squeeze().tolist()
 		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('torch')
 		return embeddings
@@ -279,14 +280,38 @@ class Experiment:
 
 		:param protected_property: The reference to the protected property data (name, type, words_file_id, templates_file_id).
 		:param stereotyped_property: The reference to the stereotyped property data (name, type, words_file_id, templates_file_id).
-		:param num_max_tokens: The number of maximum tokens to consider in the embeddings.
-		:param num_templates: The number of templates to consider in the embeddings.
 		:return: A tuple containing the embeddings for the protected and stereotyped property.
 		"""
 		protected_embedding_dataset = Experiment._get_property_embeddings(self.protected_property, configs).sort('word')
 		stereotyped_embedding_dataset = Experiment._get_property_embeddings(self.stereotyped_property, configs).sort('word')
-		if 'descriptor' in stereotyped_embedding_dataset.column_names:
-			stereotyped_embedding_dataset = stereotyped_embedding_dataset.filter(lambda x: x['descriptor'] != 'unused')
+		return protected_embedding_dataset, stereotyped_embedding_dataset
+
+	@staticmethod
+	def _get_property_raw_embeddings(property: PropertyDataReference, configs: Configurations, rebuild: bool=REBUILD) -> Dataset:
+		"""
+		Returns the embeddings for the given property, in the "raw" format.
+		This means that the templates are not averaged, and the words are not combined in testcases.
+
+		:param property: The reference to the property data (name, type, words_file_id, templates_file_id).
+		:param configs: The configurations to use for the experiment.
+		:return: The "raw" embeddings for the given property.
+		"""
+		# Retrieving embeddings dataset from cache
+		embeddings: Dataset = get_cached_raw_embeddings(property, configs, rebuild)
+		# squeezed_embs = embeddings['embedding'].squeeze().tolist()
+		# embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('torch')
+		return embeddings
+	
+	def _get_raw_embeddings(self, configs: Configurations, rebuild: bool=REBUILD) -> tuple[Dataset, Dataset]:
+		"""
+		Returns the embeddings for the protected and stereotyped property.
+
+		:param protected_property: The reference to the protected property data (name, type, words_file_id, templates_file_id).
+		:param stereotyped_property: The reference to the stereotyped property data (name, type, words_file_id, templates_file_id).
+		:return: A tuple containing the embeddings for the protected and stereotyped property.
+		"""
+		protected_embedding_dataset = Experiment._get_property_raw_embeddings(self.protected_property, configs, rebuild).sort(['template', 'word'])
+		stereotyped_embedding_dataset = Experiment._get_property_raw_embeddings(self.stereotyped_property, configs, rebuild).sort(['template', 'word'])
 		return protected_embedding_dataset, stereotyped_embedding_dataset
 
 	@abstractmethod

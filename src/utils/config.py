@@ -16,26 +16,82 @@ from utils.const import *
 class Parameter(Enum):
 	"""
 	This class represents a parameter.
+	A parameter is a variable that can be set to a value, and it is used to configure a run of the program.
+	Each parameter has a name, a default value, and an abbreviation (optional, used to represent the parameter in a string).
 	"""
+
+	# Raw embeddings computation
+
 	MODEL_NAME = "model_name", DEFAULT_MODEL_NAME, "MODEL"
-	TEMPLATES_SELECTED_NUMBER = "templates_selected_number", DEFAULT_TEMPLATES_SELECTED_NUMBER, "TM"
-	AVERAGE_TEMPLATES = "average_templates", DEFAULT_AVERAGE_TEMPLATES
+	""" The name of the Large Language Model from the Huggingface library. """
+	
 	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TK"
-	AVERAGE_TOKENS = "average_tokens", DEFAULT_AVERAGE_TOKENS
-	DISCARD_LONGER_WORDS = "discard_longer_words", DEFAULT_DISCARD_LONGER_WORDS
+	""" The maximum number of tokens to consider in a word. The value can be an integer or `all` to consider all the tokens. """
+	
+	LONGER_WORD_POLICY = "longer_word_policy", DEFAULT_LONGER_WORD_POLICY, "LWP"
+	""" How to manage words with more tokens than the maximum number of tokens.
+	If `discard`, words with more tokens than the maximum number of tokens are discarded. 
+	If `truncate`, the tokens are truncated to the maximum number of tokens. """
+
+	AVERAGE_TOKENS = "average_tokens", True
+	"""	Whether to average the tokens of a word. I true, all the tokens obtained from the tokenization of a word are averaged.
+	@deprecated: this should be always set to True."""
+
+	# Embeddings combination in testcases
+
+	WORDS_SAMPLING_PERCENTAGE = "words_sampling_number", DEFAULT_WORDS_SAMPLING_NUMBER, "WS"
+	""" The number of words to sample from the dataset. If `all`, all the words are used.
+	If the number of words in the dataset is less than the number of words to sample, all the words are used. """
+
+	TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE = "templates_sampling_number", DEFAULT_TEMPLATES_SAMPLING_NUMBER, "TS"
+	""" The number of templates to sample from the dataset. If `all`, all the templates are used. """
+	
+	TEMPLATES_POLICY = "templates_policy", DEFAULT_TEMPLATES_POLICY
+	""" The policy to use to combine the embeddings of the templates. 
+	If `average`, all the embeddings from the same word but different embeddings are averaged in one embedding.
+	If `distinct`, the embeddings of the same word are taken separately. """
+
+	MAX_TESTCASE_NUMBER = "testcase_number", DEFAULT_MAX_TESTCASE_NUMBER, "TESC"
+	""" The number of testcases to generate, for each combination of parameters.
+	If the number of possible combinations is less than the number of testcases to generate, all the possible combinations are used. 
+	(E.g. in subsampling 3 words among 4, the maximum number of possible combinations is 4)."""
+	
+	# Testcase post-processing
+
 	CENTER_EMBEDDINGS = "center_embeddings", DEFAULT_CENTER_EMBEDDINGS, "CE"
-	TEST_SPLIT_PERCENTAGE = "test_split_percentage", DEFAULT_TEST_SPLIT_PERCENTAGE, "SP"
-	CLASSIFIER_TYPE = "classifier", DEFAULT_CLASSIFIER_TYPE, "CL"
-	REDUCTION_TYPE = "reduction", DEFAULT_REDUCTION_TYPE, "RD"
-	CROSSING_STRATEGY = "crossing_strategy", DEFAULT_CROSSING_STRATEGY, "CR"
-	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
+	""" Whether to center the embeddings of the testcases. If true, the embeddings are centered, i.e. the mean of the embeddings is subtracted from each embedding. """
+
+	# Reduction configurations
+
+	REDUCTION_CLASSIFIER_TYPE = "reduction_classifier", DEFAULT_CLASSIFIER_TYPE, "ReCL"
+	""" The classifier to use to reduce the embeddings. Possible values are `svm` and `linear`. """
+
 	EMBEDDINGS_DISTANCE_STRATEGY = "embeddings_distance_strategy", DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY, "EDIST"
+	""" The strategy to use to compute the distance between the embeddings. Possible values are `euclidean` and `cosine`. """
+
+	#### TODO: multiple parameters need to be added here for the reduction of the embeddings
+
+	# Bias detection analysis on reduced embeddings
+
+	CROSS_CLASSIFIER_TYPE = "cross_classifier", DEFAULT_CLASSIFIER_TYPE, "CrCL"
+	""" The classifier to use to produce the contingency table, which crosses the protected and stereotyped words.
+	Possible values are `svm` and `linear`. """
+
+	BIAS_TEST = "bias_test", "chi2", "BiTS"
+	""" The statistical test to use to detect the bias on the contingency table.
+	If `chi_squared`, the chi-squared test is used to detect the bias. """ # Note: this is the only strategy available at the moment.
+
+	# Other parameters
+	TEST_SPLIT_PERCENTAGE = "test_split_percentage", DEFAULT_TEST_SPLIT_PERCENTAGE, "SP"
+	CROSS_PROBABILITY_STRATEGY = "cross_probability_strategy", DEFAULT_CROSS_PROBABILITY_STRATEGY, "CR"
+	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
+	REDUCTION_TYPE = "reduction", DEFAULT_REDUCTION_TYPE, "RD"
 
 	def __new__(cls, str_value: str, default: Any, abbr: str = None):
 		obj = object.__new__(cls)
-		obj._value_: str = str_value
-		obj._default_: Any = default
-		obj._abbr_: str = abbr
+		obj._value_: str = str_value 	# type: ignore	# For reasons that are unintelligible to humans, Python requires these comments to avoid a warning 
+		obj._default_: Any = default 	# type: ignore
+		obj._abbr_: str = abbr 			# type: ignore
 		if abbr is not None:
 			# Create alias
 			cls._value2member_map_[abbr] = obj
@@ -58,6 +114,12 @@ class Parameter(Enum):
 		:return: The abbreviation of the parameter.
 		"""
 		return self._abbr_
+	
+	def __repr__(self) -> str:
+		"""
+		Represents the parameter with the name.
+		"""
+		return f"p\'{self._value_}\'"
 
 
 class Configurations:
@@ -189,7 +251,7 @@ class Configurations:
 
 		:return: The set of configurations as a string.
 		"""
-		return "\n".join([f"\t> {str(k.value):30s}: {str(v)}" for k, v in self.__configs.items()])
+		return "\n".join([f"\t> \033[36m{str(k.value):30s}\033[0m: \033[96m{str(v)}\033[0m" for k, v in self.__configs.items()])
 	
 	def __str__(self) -> str:
 		"""
@@ -242,43 +304,98 @@ class ConfigurationsGrid:
 
 	def __init__(self, values: dict[Parameter, list[Any] | Any]) -> None:
 		self.__values: dict[Parameter, list[Any] | Any] = values
-		self.__num_combinations: int = 0
-		self.__curr_combination_index: int = 1
-		self.__indices: dict[Parameter, int] = {}
+		""" The values of the parameters. Each value can be a single value or a list of values. """
+		self.__indices: dict[Parameter, int] = {key: 0 for key in self.__values.keys() if isinstance(self.__values[key], list)}
+		""" The indices of the current combination of values, only for the parameters with multiple values. """
+		self.__changing_parameters: list[Parameter] = [key for key in self.__values.keys() if isinstance(self.__values[key], list)]
+		""" The parameters with multiple values. """
+		self.__has_just_started: bool = False
 
 	def __iter__(self) -> "ConfigurationsGrid":
-		self.__num_combinations = 1
-		# Reset indices to 0s
-		self.__curr_combination_index = 0
-		for key in self.__values.keys():
-			if isinstance(self.__values[key], list):
-				self.__indices[key] = 0
-				self.__num_combinations *= len(self.__values[key])
-			else:
-				continue
+		"""
+		Initializes the iterator.
+		It returns the iterator itself, and it is called implicitly at the beginning of the iteration.
+		For this reason, it's used to reset the iterator.
+		"""
+		# We setup the flag for the first iteration
+		self.__has_just_started = True
 		return self
 	
 	def __next__(self) -> Configurations:
+		# [0] We check if the iteration has ended
 		if self.__has_ended():
 			raise StopIteration
+		else:
+			self.__has_just_started = False
+
+		# [1] We compute the current combination of values based on the indices
 		configs = Configurations()
 		for key in self.__values.keys():
 			if isinstance(self.__values[key], list):
 				configs.set(key, self.__values[key][self.__indices[key]], mutable=True)
 			else:
 				configs.set(key, self.__values[key], mutable=False)
+
+		# [2] We increment the indices
 		self.__increment_indices()
 		return configs
 	
 	def __increment_indices(self) -> None:
-		self.__curr_combination_index += 1
-		for key in self.__values.keys():
-			if isinstance(self.__values[key], list):
-				self.__indices[key] += 1
-				if self.__indices[key] >= len(self.__values[key]):
-					self.__indices[key] = 0
+		"""	
+		Increments the indices of the current combination of values.
+		"""
+		curr_index: int = 0
+		while curr_index < len(self.__changing_parameters):
+			curr_key: Parameter = self.__changing_parameters[curr_index]
+			self.__indices[curr_key] += 1
+			if self.__indices[curr_key] >= len(self.__values[curr_key]):
+				self.__indices[curr_key] = 0
+				curr_index += 1
 			else:
-				continue
+				break
 	
 	def __has_ended(self) -> bool:
-		return self.__curr_combination_index >= self.__num_combinations
+		"""
+		Checks if the iteration has ended, by checking if all the indices are at the end of the list of values.
+		"""
+		return not self.__has_just_started and sum([i for i in self.__indices.values()]) == 0
+	
+	def subget(self, *keys: list[Parameter]) -> "ConfigurationsGrid":
+		"""
+		Gets another ConfigurationsGrid object with only the selected parameters.
+
+		:param keys: The keys.
+		:return: The "subset" of the configurations.
+		"""
+		tmp_dict:  dict[Parameter, list[Any] | Any] = {}
+		for key in keys:
+			tmp_dict[key] = self.__values[key]
+		return ConfigurationsGrid(tmp_dict)
+
+
+class Configurable:
+	"""
+	This class represents an object that can be configured using a set of configurations.
+	A `Configured` is initialized with a set of configurations and a list of `Parameter` objects.
+	The parameters are used to filter the configurations values: only the values of the configurations that correspond
+	to the parameters are used to configure the object. The other values are discarded.
+	"""
+
+	def __init__(self, configs: Configurations | ConfigurationsGrid, parameters: list[Parameter]) -> None:
+		if not configs:
+			raise ValueError("The set of configurations cannot be empty.")
+		if not parameters:
+			raise ValueError("The list of parameters cannot be empty. At least one parameter must be provided.")
+		self.__configs: Configurations | ConfigurationsGrid = configs.subget(*parameters)
+		# FIXME: this is a temporary solution, for which both Configurations and ConfigurationsGrid are accepted.
+		# In order to do so, both classes implement the same method "subget", which is used to filter the configurations.
+		# This is not a good solution and should be changed in the future, with a better design allowing to use only one class.
+	
+	@property
+	def configs(self) -> Configurations | ConfigurationsGrid:
+		"""
+		Gets the configurations of the object.
+
+		:return: The configurations of the object.
+		"""
+		return self.__configs

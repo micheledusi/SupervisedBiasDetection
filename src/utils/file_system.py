@@ -8,22 +8,14 @@
 # This module offers some utility functions to retrieve the paths of the files
 # used in the project, based on some naming conventions.
 
-from utils.caching.creation import BiasDataReference
+from data_processing.data_reference import BiasDataReference
 from utils.config import Configurations, Parameter
-from utils.const import *
+from utils.const import FOLDER_RESULTS, FOLDER_CROSSED_EVALUATION, FILE_GENERATION
 
 
 def get_crossed_evaluation_data_folder(protected_property: str, stereotyped_property: str) -> str:
     inner_folder: str = f"{protected_property}-{stereotyped_property}"
     return FOLDER_CROSSED_EVALUATION + "/" + inner_folder
-
-
-def get_protected_property_data_folder(protected_property: str) -> str:
-    return FOLDER_PROTECTED_PROPERTY + "/" + protected_property
-
-
-def get_stereotyped_property_data_folder(stereotyped_property: str) -> str:
-    return FOLDER_STEREOTYPED_PROPERTY + "/" + stereotyped_property
 
 
 def get_file_desinence(id: int) -> str:

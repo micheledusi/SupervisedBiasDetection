@@ -15,8 +15,8 @@ from abc import ABC, abstractmethod
 from datasets import Dataset
 import torch
 from tqdm import tqdm
+from data_processing.sentence_maker import replace_word
 
-from data_processing.sentence_maker import replace_protected_word, replace_stereotyped_word
 from model.embedding.word_embedder import WordEmbedder
 from utils.config import Configurations, Parameter
 
@@ -46,7 +46,7 @@ class CrossingScorer(ABC):
 			self.max_tokens_number: int = 1	# At least one token has to be considered
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		self.discard_longer_words = configs[Parameter.DISCARD_LONGER_WORDS]
+		self.discard_longer_words = configs[Parameter.LONGER_WORD_POLICY]
 		
 		# Initializing the embedder and the tokenizer
 		self.embedder = WordEmbedder(configs)
@@ -69,8 +69,7 @@ class CrossingScorer(ABC):
 			print("Filtering the stereotyped words...")
 			stereotyped_words = stereotyped_words \
 				.filter(lambda x: self.embedder.get_tokens_number(x['word']) <= self.max_tokens_number) \
-				.filter(lambda x: 'descriptor' not in x or x['descriptor'] != 'unused')
-				# FIXME this is a temporary fix to avoid the "unused" words that can be present in the dataset
+				.filter(lambda x: 'descriptor' not in x)
 			# If there are no more rows, we raise an error
 			if len(stereotyped_words) == 0:
 				raise ValueError("The stereotyped words dataset is empty after filtering the words with more tokens than the maximum number of tokens.")
@@ -91,13 +90,13 @@ class CrossingScorer(ABC):
 		for i, sw in tqdm(enumerate(stereotyped_words), total=len(stereotyped_words)):
 			# For each template, we insert the stereotyped word in the slot
 			# And we filter only the sentences where the replacement has been performed
-			sw_sentences_pairs = [replace_stereotyped_word(sent, sw) for sent in templates['template']]
+			sw_sentences_pairs = [replace_word(sent, sw) for sent in templates['template']]
 			sw_sentences = [sent_pair[0] for sent_pair in sw_sentences_pairs if sent_pair[1] is True]
 			
 			for j, pw in enumerate(protected_words):
 				# For each protected word, we try to replace it in the sentence
 				# And we filter only the sentences where the replacement has been performed
-				pw_sentences_pairs = [replace_protected_word(sent, pw) for sent in sw_sentences]
+				pw_sentences_pairs = [replace_word(sent, pw) for sent in sw_sentences]
 				pw_sentences = [sent_pair[0] for sent_pair in pw_sentences_pairs if sent_pair[1] is True]
 
 				if len(pw_sentences) == 0:

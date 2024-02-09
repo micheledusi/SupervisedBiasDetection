@@ -14,9 +14,9 @@ import re
 from itertools import product
 
 from data_processing.data_reference import BiasDataReference
-from data_processing.pattern import PP_PATTERN, SP_PATTERN
+from data_processing.pattern import PATTERN
 from utils.const import TOKEN_MASK
-from utils import file_system as fs
+from utils.file_system import get_crossed_evaluation_generation_file
 from utils.article_inference import add_article
 
 
@@ -81,7 +81,7 @@ def get_generation_datasets(bias_reference: BiasDataReference) -> tuple[Dataset,
 
     :return: The tuple containing the three datasets.
     """
-    filepath: str = fs.get_crossed_evaluation_generation_file(bias_reference)
+    filepath: str = get_crossed_evaluation_generation_file(bias_reference)
     with open(filepath, "r") as file:
         # Obtain the generation-sentence data object
         gen_obj = json.load(file)
@@ -91,7 +91,7 @@ def get_generation_datasets(bias_reference: BiasDataReference) -> tuple[Dataset,
         return pp_words, sp_words, templates
 
 
-def replace_word(sentence: str, word: dict[str, str], pattern: re.Pattern[str]) -> tuple[str, bool]:
+def replace_word(sentence: str, word_sample: dict[str, str], pattern: re.Pattern[str]) -> tuple[str, bool]:
     """
     This function will replace all the occurrences of the given pattern in the given sentence with the given word.
     If the sentence contain multiple occurrences of the pattern, each one will be replaced with the given word
@@ -109,67 +109,56 @@ def replace_word(sentence: str, word: dict[str, str], pattern: re.Pattern[str]) 
     :param pattern: The pattern that will be used to find the word.
     :return: The sentence with the word inserted and a boolean indicating if the word was inserted at least once (True) or not (False).
     """
-    assert 'word' in word, "The word must have a 'word' key."
+    assert 'word' in word_sample, "The word must have a 'word' key."
     replaced: bool = False
     found = pattern.findall(sentence)
     for matched in found:
         mask, required_descriptor = matched[0], matched[1]
         if not required_descriptor:
             # No descriptor is required, so any word can be inserted
-            sentence = sentence.replace(mask, word['word'])
+            sentence = sentence.replace(mask, word_sample['word'])
             replaced = True
-        elif word.get('descriptor', '') == required_descriptor:
+        elif word_sample.get('descriptor', '') == required_descriptor:
             # OR the descriptor is required and it matches the word's descriptor (which exists)
-            sentence = sentence.replace(mask, word['word'])
+            sentence = sentence.replace(mask, word_sample['word'])
             replaced = True
         elif required_descriptor == 'art':
             # Special case: we need to add the indeterminative article
-            sentence = sentence.replace(mask, add_article(word['word']))
+            sentence = sentence.replace(mask, add_article(word_sample['word']))
             replaced = True
     return sentence, replaced
 
 
-def replace_protected_word(template: str, word: dict[str, str]) -> tuple[str, bool]:
+def replace_word_in_templates(word_sample: dict[str, str], templates: Dataset, pattern: re.Pattern[str]) -> Dataset:
     """
-    This function will replace all the occurrences of the protected word pattern in the given template with the given word.
-    If the template contain multiple occurrences of the pattern, each one will be replaced with the given word
+    This function will replace all the occurrences of the given pattern in the given templates with the given word.
+    If a template contain multiple occurrences of the pattern, each one will be replaced with the given word
     if and only if the word's descriptor matches the required descriptor (if any).
 
     A special case is when the required descriptor is None or an empty string. In this case, the word can be inserted in any case.
     Another special case is when the required descriptor is "art", in which case the word will be inserted with the correct indeterminative article
     (e.g. "a" or "an", inferred from the word itself).
 
-    The method considers the replacement successful if at least one replacement was made, and thus it returns True and the modified template.
-    If no replacement was made, the method returns False (along with the unmodified template).
+    At the end, only the templates with at least one replacement will be returned.
 
-    :param template: The template in which the word will be inserted.
-    :param word: The word that will be inserted.
-    :return: The template with the word inserted and a boolean indicating if the word was inserted at least once (True) or not (False).
+    :param word_sample: The word that will be inserted, as a row of the <words> dataset.
+    :param templates: The templates in which the word will be inserted, as a dataset.
+    :param pattern: The pattern that will be used to find the word.
+    :return: A dataset containing the templates ('template' column) and the formed sentences ('sentence' column), then filtered for only the correct replacements.
     """
-    return replace_word(template, word, PP_PATTERN)
+    assert 'template' in templates.column_names, "The templates must have a 'template' column."
+    # For each template, we replace the word in the pattern through the `replace_word` function
+    sentences_tuples = [replace_word(template, word_sample, pattern) for template in templates['template']]
+    # Adding the columns to the dataset
+    result_ds: Dataset = templates.add_column('sentence', [tpl[0] for tpl in sentences_tuples])
+    result_ds = result_ds.add_column('replacement', [tpl[1] for tpl in sentences_tuples])
+    # We filter the sentences to keep only the ones with the word inserted
+    result_ds = result_ds.filter(lambda x: x['replacement'] == True)
+    # We keep only the sentences, without the boolean flag
+    return result_ds.remove_columns('replacement')
 
 
-def replace_stereotyped_word(template: str, word: dict[str, str]) -> tuple[str, bool]:
-    """
-    This function will replace all the occurrences of the stereotyped word pattern in the given template with the given word.
-    If the template contain multiple occurrences of the pattern, each one will be replaced with the given word
-    if and only if the word's descriptor matches the required descriptor (if any).
-
-    A special case is when the required descriptor is None or an empty string. In this case, the word can be inserted in any case.
-    Another special case is when the required descriptor is "art", in which case the word will be inserted with the correct indeterminative article
-    (e.g. "a" or "an", inferred from the word itself).
-
-    The method considers the replacement successful if at least one replacement was made, and thus it returns True and the modified template.
-    If no replacement was made, the method returns False (along with the unmodified template).
-
-    :param template: The template in which the word will be inserted.
-    :param word: The word that will be inserted.
-    :return: The template with the word inserted and a boolean indicating if the word was inserted at least once (True) or not (False).
-    """
-    return replace_word(template, word, SP_PATTERN)
-
-
-def mask_word(sentence: str, pattern: str, word: dict[str, str] = None) -> tuple[str, bool]:
+def mask_word(sentence: str, pattern: str, word_sample: dict[str, str] = None) -> tuple[str, bool]:
     """
     This function will mask all the occurrences of the given pattern in the given sentence.
     If the sentence contain multiple occurrences of the pattern, each one will be masked.
@@ -178,38 +167,16 @@ def mask_word(sentence: str, pattern: str, word: dict[str, str] = None) -> tuple
     If the given word is None, the method will blindly mask all the occurrences of the pattern.
 
     :param sentence: The sentence in which the word will be masked.
+    :param word_sample: The word that constraints the masking, if the word's descriptor matches the required descriptor in the sentence.
     :param pattern: The pattern that will be used to find the word.
-    :param word: The word that constraints the masking, if the word's descriptor matches the required descriptor in the sentence.
     :return: The sentence with the word masked.
     """
     # Create a masked word
-    masked_word: dict[str, str] = word.copy() if word is not None else {}
+    masked_word: dict[str, str] = word_sample.copy() if word_sample is not None else {}
     masked_word['word'] = TOKEN_MASK
 
     # Replace the pattern with the masked word, only if the word's descriptor matches the required descriptor (if any)
     return replace_word(sentence, masked_word, pattern)
-
-
-def mask_protected_word(template: str, word: dict[str, str] = None) -> tuple[str, bool]:
-    """
-    This function will mask all the occurrences of the protected word pattern in the given template.
-    If the template contain multiple occurrences of the pattern, each one will be masked.
-
-    :param template: The template in which the word will be masked.
-    :return: The template with the word masked.
-    """
-    return mask_word(template, PP_PATTERN, word)
-
-
-def mask_stereotyped_word(template: str, word: dict[str, str] = None) -> tuple[str, bool]:
-    """
-    This function will mask all the occurrences of the stereotyped word pattern in the given template.
-    If the template contain multiple occurrences of the pattern, each one will be masked.
-
-    :param template: The template in which the word will be masked.
-    :return: The template with the word masked.
-    """
-    return mask_word(template, SP_PATTERN, word)
 
 
 class TemplateCombinator:
@@ -265,4 +232,4 @@ class TemplateCombinator:
 
 
 def template_combinator(templates_dataset: Dataset, stereotyped_words: Dataset, protected_words: Dataset) -> TemplateCombinator:
-    return TemplateCombinator((SP_PATTERN, stereotyped_words), (PP_PATTERN, protected_words), templates_dataset=templates_dataset)
+    return TemplateCombinator((PATTERN, stereotyped_words), (PATTERN, protected_words), templates_dataset=templates_dataset)

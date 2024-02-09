@@ -34,10 +34,10 @@ if __name__ == '__main__':
 
 	# Configurations
 	configs = Configurations({
-		Parameter.CROSSING_STRATEGY: 'pppl',
+		Parameter.CROSS_PROBABILITY_STRATEGY: 'pppl',
 		Parameter.POLARIZATION_STRATEGY: 'difference',
 		Parameter.MAX_TOKENS_NUMBER: 1,
-		Parameter.DISCARD_LONGER_WORDS: True
+		Parameter.LONGER_WORD_POLICY: True
 	})
 
 	binary_scorer = BinaryScorer(configs)

@@ -43,6 +43,6 @@ class CrossingFactory:
 		:param configs: The configuration object.
 		:return: The cross-scorer.
 		"""
-		crossing_strategy = CrossingStrategy(configs[Parameter.CROSSING_STRATEGY])
+		crossing_strategy = CrossingStrategy(configs[Parameter.CROSS_PROBABILITY_STRATEGY])
 		return crossing_strategy.get_instance(configs)
 	

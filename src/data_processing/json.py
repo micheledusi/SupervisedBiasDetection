@@ -88,6 +88,17 @@ class EmbeddingsJSONConverter(JSONConverter):
 		return Dataset.from_dict(json_data).with_format("torch", device=DEVICE)
 
 
+class RawEmbeddingsJSONConverter(EmbeddingsJSONConverter):
+	"""
+	This class is used to convert the new format of embeddings to JSON format, and vice versa.
+	The "raw" embeddings are embeddings of single words for single templates.
+	"""
+	def to_json(self, embeddings: Dataset) -> JSON:
+		assert "sentence" in embeddings.features, "The embeddings must have a 'sentence' column."
+		assert "template" in embeddings.features, "The embeddings must have a 'template' column."
+		return super().to_json(embeddings)
+
+
 class CrossingScoresJSONConverter(JSONConverter):
 	"""
 	This class is used to convert crossing scores to JSON format, and vice versa.

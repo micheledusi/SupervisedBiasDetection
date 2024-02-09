@@ -41,7 +41,7 @@ class MLMPredictor:
 			self.max_tokens_number: int = max(1, arg_tkns)
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		self.discard_longer_words: bool = configs.get(Parameter.DISCARD_LONGER_WORDS, DEFAULT_DISCARD_LONGER_WORDS)
+		self.discard_longer_words: bool = configs.get(Parameter.LONGER_WORD_POLICY, DEFAULT_LONGER_WORD_POLICY)
 
 	def predict(self, sentences: str | list[str], target: str) -> torch.Tensor:
 		"""

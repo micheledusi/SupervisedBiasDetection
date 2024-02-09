@@ -12,53 +12,37 @@
 
 import random
 import re
+from deprecated import deprecated
 import torch
-from datasets import Dataset
+from datasets import Dataset, concatenate_datasets
 from datasets.fingerprint import Hasher
-from transformers import AutoModel, AutoTokenizer, logging
+from transformers import AutoModel, AutoTokenizer
 
-import sys
-from pathlib import Path
-directory = Path(__file__)
-sys.path.append(str(directory.parent.parent.parent))
-from data_processing.sentence_maker import SP_PATTERN, get_dataset_from_words_csv, replace_word
-from utils.config import Configurations, Parameter
-from utils.const import *
+if __name__ == "__main__":
+	import sys
+	from pathlib import Path
+	directory = Path(__file__)
+	sys.path.append(str(directory.parent.parent.parent))
+	sys.path.append(str(directory.parent.parent.parent.parent))
 
-# Disabling transformers logging
-logging.set_verbosity_error()
+from data_processing.sentence_maker import replace_word, replace_word_in_templates
+from data_processing.pattern import PATTERN
+from utils.config import Configurations, Configurable, Parameter
+from utils.const import DEVICE, NUM_PROC, BATCH_SIZE
 
+
+@deprecated("This class is deprecated. Use the 'RawEmbedder' class instead.")
 class WordEmbedder:
 	"""
 	This class offers the ability to extract embeddings from a word, through the model BERT.
 	In order to extract an embedding, the user must call the "embed" method.
 	"""
-	def __init__(self, configs: Configurations, pattern: re.Pattern[str] | str = SP_PATTERN) -> None:
+	def __init__(self, configs: Configurations, pattern: re.Pattern[str] | str = PATTERN) -> None:
 		"""
 		This method initializes the class.
-		Possible keyword arguments are:
-
-			- ``templates_selected_number``: the number of templates to select for each word. 
-			If the value is "-1", all the templates will be selected. The selection is done randomly. 
-			By default, it will select all the templates.
-
-			- ``average_templates``: whether to average the embeddings of each template or not, for a single word.
-			By default, it will average the embeddings (i.e. the value is True).
-
-			- ``average_tokens``: whether to average the embeddings of each token or not, for a single word.
-			Note: we don't know in advance if the word will be split into multiple tokens.
-			By default, it will average the embeddings (i.e. the value is True).
-
-			- ``max_tokens_number``: the maximum number of tokens to consider for a single word.
-			By default, it will consider all the tokens (i.e. the value is "-1").
-
-			- ``discard_longer_words``: whether to discard the words that are longer than the maximum number of tokens.
-			By default, it will not discard the words (i.e. the value is False).
-
-		This parameters are used in the "embed" method.
 
 		:param configs: The configurations of the project.
-		:param pattern: The pattern used to find the word in the sentence. By default, it will use the "Stereotype Property" pattern from 'sentence_maker.py'.
+		:param pattern: The pattern used to find the word in the sentence.
 		"""
 		# Processing arguments
 		# The pattern used to find the word in the sentence.
@@ -70,18 +54,18 @@ class WordEmbedder:
 		# The number of templates to select for each word.
 		# If the value is "-1", all the templates will be selected.
 		# The selection is done randomly.
-		arg_tmpl = configs.get(Parameter.TEMPLATES_SELECTED_NUMBER, DEFAULT_TEMPLATES_SELECTED_NUMBER)
+		arg_tmpl = configs[Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE]
 		if arg_tmpl == 'all' or arg_tmpl == -1:
 			self.templates_selected_number: int = -1 # "-1" means all templates will be selected
 		else:
 			self.templates_selected_number: int = max(1, arg_tmpl)	# At least one template will be selected
 		
 		# Whether to average the embeddings of each template or not, for a single word
-		self.average_templates = configs.get(Parameter.AVERAGE_TEMPLATES, DEFAULT_AVERAGE_TEMPLATES)
+		self.average_templates = configs.get(Parameter.TEMPLATES_POLICY)
 
 		# Whether to average the embeddings of each token or not, for a single word
 		# Note: we don't know in advance if the word will be split into multiple tokens
-		self.average_tokens = configs.get(Parameter.AVERAGE_TOKENS, DEFAULT_AVERAGE_TOKENS)
+		self.average_tokens = configs.get(Parameter.AVERAGE_TOKENS)
 		
 		# The maximum number of tokens to consider for each word
 		# If the value is "-1", all the tokens will be considered
@@ -90,14 +74,14 @@ class WordEmbedder:
 		#	- if the number of tokens is greater than the maximum number of tokens:
 		#		- if the value of "discard_longer_words" is True, the word will be discarded
 		#		- if the value of "discard_longer_words" is False, the considered tokens will be the first "max_tokens_number" tokens
-		arg_tkns = configs.get(Parameter.MAX_TOKENS_NUMBER, DEFAULT_MAX_TOKENS_NUMBER)
+		arg_tkns = configs.get(Parameter.MAX_TOKENS_NUMBER)
 		if arg_tkns == 'all' or arg_tkns == -1:
 			self.max_tokens_number: int = -1
 		else:
 			self.max_tokens_number: int = max(1, arg_tkns)
 		
 		# Whether to discard the words that are split into more tokens than the maximum number of tokens
-		self.discard_longer_words = configs.get(Parameter.DISCARD_LONGER_WORDS, DEFAULT_DISCARD_LONGER_WORDS)
+		self.discard_longer_words = configs.get(Parameter.LONGER_WORD_POLICY)
 
 		# The model used to extract the embeddings
 		model_name: str = configs[Parameter.MODEL_NAME]
@@ -156,7 +140,7 @@ class WordEmbedder:
 		def compute_sentences_fn(word_sample):
 			""" Getting the sentences for a given word """
 			# Creating a list of sentences, where the word was replaced, and filtering out the ones that are not valid
-			sentences = map(lambda x: replace_word(sentence=x, word=word_sample, pattern=self.pattern), templates_list)
+			sentences = map(lambda x: replace_word(sentence=x, word_sample=word_sample, pattern=self.pattern), templates_list)
 			sentences = filter(lambda x: x[1] == True, sentences)
 			sentences = list(map(lambda x: x[0], sentences))
 			# Selecting a random subset of templates/sentences if needed
@@ -164,8 +148,8 @@ class WordEmbedder:
 				random.shuffle(sentences)
 				sentences = sentences[:self.templates_selected_number]
 			
-			if len(sentences) == 0 and word_sample['descriptor'] != 'unused':
-				raise Warning(f"Zero (0) sentences were found for the word \"{word_sample['word']}\", which has not an explicit <unused> descriptor.\n" +
+			if len(sentences) == 0:
+				raise Warning(f"Zero (0) sentences were found for the word \"{word_sample['word']}\".\n" +
 				"This may be due to the fact that the word is not present in the templates, or that the word is not present in the templates with the same descriptor.")
 
 
@@ -229,7 +213,6 @@ class WordEmbedder:
 		# However, if the word has no sentences to be embedded, the corresponding tensor has a shape of [0, #tokens, #features]
 		return words_embeddings
 
-
 	def embed(self, words: Dataset, templates: Dataset) -> Dataset:
 		"""
 		This method returns a dataset where each word is associated with its embedding(s).
@@ -237,7 +220,7 @@ class WordEmbedder:
 		computed accodingly to the ``embed_word`` method and the initial parameters.
 
 		The returned dataset contains:
-		- The original items: "word", "descriptor", and (optional) "value".
+		- The original items: "word", "descriptor", and "value".
 		- The following new item: "embedding", which is a PyTorch tensor of size [#templates, #tokens, #features].
 		Note that the number of tokens in the embedding can vary, depending on the word and the model vocabulary;
 		thus, the tensors in the "embedding" item are not necessarily of the same size.
@@ -257,19 +240,27 @@ class WordEmbedder:
 		if not words:
 			raise ValueError("The words must be provided as a parameter.")
 
+		# Tokenizing and filtering the words
+		# Words dataset is: ['word', 'value', 'descriptor'(optional)]
+
 		def tokenize_words_batch_fn(batch: dict[list]) -> dict[list]:
+			# We tokenize the single word
 			tokens_ids = self.tokenizer(batch['word'], padding=False, truncation=False, add_special_tokens=False)
-			# Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
+			# NOTE: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
 			batch['tokens'] = tokens_ids['input_ids']
 			batch['num_tokens'] = [len(tokens) for tokens in tokens_ids['input_ids']]
-			# Discarding the words that are too long
-			reduced_batch = {}
-			tokens_numbers = batch['num_tokens']
+
+			# Checking what to do with the words that are too long
 			if self.discard_longer_words and self.max_tokens_number != -1:
+				reduced_batch = {}
+				tokens_numbers = batch['num_tokens']
 				for column in batch:
 					reduced_batch[column] = [elem for elem, num_tokens in zip(batch[column], tokens_numbers) if num_tokens <= self.max_tokens_number]
 				batch = reduced_batch
 			return batch
+		
+		words = words.map(tokenize_words_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)
+		# Current columns: ['word', 'value', 'descriptor'(optional), 'tokens', 'num_tokens']
 
 		def embed_words_batch_fn(batch: dict[list]) -> dict[list]:
 			# "batch" is a dictionary of lists, where each list contains the values of a column
@@ -278,10 +269,6 @@ class WordEmbedder:
 			batch['embedding'] = embeddings
 			return batch
 
-		# Tokenizing and filtering the words
-		words = words.map(tokenize_words_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)
-		# Current columns: ['word', 'value', 'descriptor'(optional), 'tokens', 'num_tokens']
-
 		# Hashing a function. This is needed for the internal caching of the PyArrow Dataset
 		Hasher.hash(embed_words_batch_fn)
 		# Embedding the words
@@ -289,16 +276,260 @@ class WordEmbedder:
 		# NOTE: the 'num_tokens' column is removed, since it's not needed anymore. If you want to keep it, you can edit the previous line.
 		embeddings_ds = embeddings_ds.with_format('torch', device=DEVICE)
 		return embeddings_ds
+	
+
+class RawEmbedder(Configurable):
+	"""
+	This class is an alternative to the "WordEmbedder" class.
+	Instead of processing the embeddings with combining operations, it simply crosses the words dataset with the templates dataset, 
+	and then it tokenizes the sentences and computes the embeddings.
+
+	NOTE: This is an attempt to create a more efficient version of the "WordEmbedder" class.
+	It will be merged with the "WordEmbedder" class in the future, if it will be successful.
+	"""
+	def __init__(self, configs: Configurations, pattern: re.Pattern[str] | str = PATTERN) -> None:
+		# Calling the superclass constructor
+		# The constructor of superclass `Configured` declares the list of parameters that are used in the class.
+		# This is an additional check to ensure that no parameter outside of the list is used.
+		super(RawEmbedder, self).__init__(configs, parameters=[
+			Parameter.MODEL_NAME,
+			Parameter.MAX_TOKENS_NUMBER,
+			Parameter.LONGER_WORD_POLICY,
+			])
+		
+		# Saving the pattern used to find the word in the sentence
+		if isinstance(pattern, str):
+			self.pattern: re.Pattern[str] = re.compile(pattern)
+		else:
+			self.pattern: re.Pattern[str] = pattern
+
+		# The model used to extract the embeddings
+		self.tokenizer = AutoTokenizer.from_pretrained(self.configs[Parameter.MODEL_NAME], add_prefix_space=True)	# The tokenizer must be initialized with the "add_prefix_space", specifically for the RoBERTa model. In this case, in fact, the tokenizer will tokenize differently the words at the beginning of each sentence.
+		self.model = AutoModel.from_pretrained(self.configs[Parameter.MODEL_NAME]).to(DEVICE)
+	
+
+	def embed(self, words: Dataset, templates: Dataset) -> Dataset:
+		"""
+		This method returns a dataset where each row is a combination of a word and a dataset. 
+		This combination contains the embedding(s) associated to it.
+
+		The value for the "embedding" column in each row is a PyTorch tensor of size [#features],
+		which refers to the embeddings of the word within the associated template. If the word is split into multiple tokens, the tokens are averaged.
+		For this reason, the 'tokens' dimension does not appear in the returned dataset.
+
+		In details, the returned dataset contains:
+		- The original items: "word", "descriptor", "value" (optional), and "template".
+		- The following new item: "embedding", which is a PyTorch tensor of size [#features]. Each row has always a single tensor of the same size.
+
+		:param words: The dataset of words to be embedded.
+		:param templates: The dataset of templates to be used to embed the words.
+		:return: The combinations (words x templates) with their embeddings.
+		"""
+		# Checks if the templates are provided as a parameter
+		if not templates:
+			raise ValueError("The templates must be provided as a parameter.")
+		if not words:
+			raise ValueError("The words must be provided as a parameter.")
+
+		# XXX: STEP 1 #
+		# Tokenizing and filtering the words
+		# Words dataset is: ['word', 'value', 'descriptor'(optional)]
+
+		def tokenize_batch_of_words_fn(batch: dict[str, list]) -> dict[str, list]:
+			# We tokenize the single words, not considering the templates
+			tokens_ids = self.tokenizer(batch['word'], padding=False, truncation=False, add_special_tokens=False)
+			# Note: the special tokens [CLS] and [SEP] are not considered (i.e. they are not added to the tokenized word)
+			batch['tokens'] = tokens_ids['input_ids']
+			batch['num_tokens'] = [len(tokens) for tokens in tokens_ids['input_ids']]
+			
+			# Checking what to do with the words that are too long
+			# If the policy for longer words is "discard"
+			if self.configs[Parameter.LONGER_WORD_POLICY] == 'discard':
+				# If the maximum number of accepted tokens is not "all" and not "-1"
+				max_tokens_number = self.configs[Parameter.MAX_TOKENS_NUMBER]
+				if max_tokens_number != 'all' \
+						and max_tokens_number != -1:
+					# We discard the words that are too long
+					reduced_batch = {}
+					tokens_numbers = batch['num_tokens']
+					for column in batch:
+						reduced_batch[column] = [elem for elem, num_tokens in zip(batch[column], tokens_numbers) if num_tokens <= max_tokens_number]
+					batch = reduced_batch
+
+			# If the policy for longer words is "truncate"
+			elif self.configs[Parameter.LONGER_WORD_POLICY] == 'truncate':
+				# If the maximum number of accepted tokens is not "all" and not "-1"
+				max_tokens_number = self.configs[Parameter.MAX_TOKENS_NUMBER]
+				if max_tokens_number != 'all' \
+						and max_tokens_number != -1:
+					# We truncate the words that are too long
+					batch['tokens'] = [tokens[:max_tokens_number] for tokens in batch['tokens']]
+					batch['num_tokens'] = [min(num_tokens, max_tokens_number) for num_tokens in batch['num_tokens']]
+
+					# TODO: Verify whether this is used in the templated embeddings
+
+			# If the policy for longer words is "ignore"
+			elif self.configs[Parameter.LONGER_WORD_POLICY] == 'ignore':
+				pass	
+
+			# If the policy for longer words is neither "discard" nor "truncate" nor "ignore"
+			else:
+				raise ValueError(f"The policy for longer words must be either 'truncate' or 'discard', not '{self.configs[Parameter.LONGER_WORD_POLICY]}'.")
+			
+			return batch
+		
+		# Applying the tokenization and filtering
+		words = words.map(tokenize_batch_of_words_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)
+		# Current columns in words dataset: ['word', 'value', 'descriptor'(optional), 'tokens', 'num_tokens']
+
+		# XXX: STEP 2 #
+		# We create the sentences for each word, by replacing the word in the templates
+		# Current columns in templates dataset: ['template']
+
+		def cross_batch_of_words_with_templates_fn(batch: dict[str, list]) -> dict[str, list]:
+			""" This function creates the sentences for each word in the batch.
+			It takes as input the batch of words. For each word in the batch, it creates the sentences where the word was replaced.
+			Each row of the batch, so, turns into a series of rows where the word was replaced in the templates.
+			NOTE: only the valid sentences are kept. If a word and a template are not compatible, the sentence is discarded.
+
+			The input batch is a dictionary with the following keys:
+			- "word": a list of strings, each string being a word to be embedded.
+			- "descriptor": a list of strings, each string being the descriptor of the word. (optional)
+			- "value": a list of strings, each string being the value of the word. (optional)
+			- "tokens": a list of lists of IDs, each list of strings being the tokens of the word.
+			- "num_tokens": a list of integers, each integer being the number of tokens of the word.
+
+			The output batch is a dictionary with the following keys:
+			- "word": a list of strings, each string being a word to be embedded.
+			- "descriptor": a list of strings, each string being the descriptor of the word. (optional)
+			- "value": a list of strings, each string being the value of the word. (optional)
+			- "tokens": a list of lists of IDs, each list of strings being the tokens of the word.
+			- "num_tokens": a list of integers, each integer being the number of tokens of the word.
+			- "template": a list of strings, each string being a template.
+			- "sentence": a list of strings, each string being a sentence where the word was replaced.
+			"""
+			# Creating a list of sentences, where the word was replaced, and filtering out the ones that are not valid
+			words_batch_ds: Dataset = Dataset.from_dict(batch)
+			sentences_batch_ds_list: list[Dataset] = []
+
+			for word in words_batch_ds:
+				# For a single word, we create the sentences where the word was replaced
+				# FIXME: This is a slow implementation, but it's maybe the most straightforward one
+				word_sentences: Dataset = replace_word_in_templates(word, templates, self.pattern)
+
+				# Checking if the word has been replaced in at least one sentence
+				if len(word_sentences) == 0:
+					# If not, the sentences are unusable. We raise a warning.
+					raise Warning(f"Zero (0) sentences were found for the word \"{word['word']}\".\n" +
+					"This may be due to the fact that the word is not present in the templates, or that the word is not present in the templates with the same descriptor.")
+				
+				# Cloning the word sample for each sentence, and adding the word columns to the sentences
+				for col in word:
+					word_sentences = word_sentences.add_column(col, [word[col]] * len(word_sentences))
+
+				# Insert the sentences for this word in the list
+				sentences_batch_ds_list.append(word_sentences)
+			
+			# Concatenating the sentences for each word
+			ds: Dataset = concatenate_datasets(sentences_batch_ds_list)
+			return ds.to_dict()
+
+		# Getting the sentences for each word
+		word_with_sentences: Dataset = words.map(cross_batch_of_words_with_templates_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)\
+			.with_format('torch', device=DEVICE)
+		# Current columns in word_with_sentences dataset: ['word', 'value', 'descriptor', 'tokens', 'num_tokens', 'template', 'sentence']
+
+		# XXX: STEP 3 #
+		# Tokenizing the sentences and computing the embeddings
+
+		def embed_sentences_batch_fn(sentences_batch: dict[str, list]) -> dict[str, list]:
+			"""
+			This method takes a batch of sentences and computes their embeddings.
+			The input ``sentences_batch`` must be a dictionary of lists, with the following keys:
+			- "word": the words to be embedded.
+			- "descriptor": the descriptors of the word.
+			- "value": the values of the word.
+			- "template": the templates to be used to embed the words.
+			- "sentence": the strings obtained by instantiating the words within the templates.
+			- "tokens": the IDs of the tokens of each word.
+			- "num_tokens": the number of tokens of each word.
+
+			The result is the same batch, with the addition of the "embedding" key, which contains the embeddings of the words.
+			"""
+			# Tokenizing the sentences
+			tokenized_sentences: torch.Tensor = self.tokenizer(sentences_batch['sentence'], padding=True, truncation=False, return_tensors='pt')['input_ids'].to(DEVICE)
+			batch_len: int = tokenized_sentences.shape[0]
+			# We obtain a tensor of size [#sentences, #tokens] containing the IDs of the tokens of each sentence
+
+			# Now we extract only the tokens IDs of the embedded words
+			words_indices: list = [self._get_subsequence_index(sentence_tokens, word_tokens) 
+							for sentence_tokens, word_tokens 
+							in zip(tokenized_sentences, sentences_batch['tokens'])]
+			assert len(words_indices) == batch_len, "The number of words_indices must be equal to the batch size."
+			
+			# Computing the embeddings
+			embeddings_tensor: torch.Tensor = self.model(tokenized_sentences)['last_hidden_state'].to(DEVICE)
+			assert embeddings_tensor.shape[0] == batch_len, "The number of embedded sentences must be equal to the batch size."
+			
+			# Extracting the embeddings of the word from the tensor
+			embeddings: list[torch.Tensor] = [embeddings_tensor[sentence_i, word_j] for sentence_i, word_j in enumerate(words_indices)]
+			# Averaging the embeddings of different tokens of the same word in the same sentence
+			embeddings = [torch.mean(emb, dim=0) for emb in embeddings]
+
+			# Adding the embeddings to the batch
+			sentences_batch['embedding'] = embeddings
+			return sentences_batch
+
+		# Embedding the words by applying the "embed_sentences_batch_fn" function
+		embeddings_ds = word_with_sentences\
+			.map(embed_sentences_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)\
+				.remove_columns(['tokens', 'num_tokens'])\
+					.with_format('torch', device=DEVICE)
+
+		# Current columns in embeddings_ds dataset: ['word', 'value', 'descriptor', 'template', 'sentence', 'embedding']
+		return embeddings_ds
+
+
+	def _get_subsequence_index(self, array: torch.Tensor, subarray: torch.Tensor) -> torch.Tensor:
+		# Example:
+		# array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+		# subarray = [3, 4, 5]
+		# output = [2]
+		window_len = subarray.shape[-1]
+		steps = array.shape[-1] - window_len + 1
+		# Unfold the last dimension of the array into 2 dimension of length [len(array) - window_len + 1, window_len]
+		unfolded_array = array.unfold(dimension=-1, size=window_len, step=1).to(DEVICE)
+		#print("Unfolded array shape:", unfolded_array.shape)
+		# Repeat the subarray to match the shape of the unfolded array
+		repeated_subarray = subarray.unsqueeze(0).repeat(steps, 1).to(DEVICE)
+		#print("Repeated subarray shape:", repeated_subarray.shape)
+		# Both arrays have the same shape now
+		# Shape = [#sentences_padded_tokens, #word_tokens]
+		# Compare the two arrays:
+		comparison = torch.all(unfolded_array == repeated_subarray, dim=-1).to(DEVICE)
+		#print("Comparison shape:", comparison.shape)
+		# Get the first occurrence index
+		first_occurrence_index = int(torch.where(comparison == True)[0])
+		# We get to a single scalar
+		# Now we repeat the first occurrence index (increasing it) for each element of the subarray
+		# Shape = [#word_tokens]
+		return torch.arange(start=first_occurrence_index, end=first_occurrence_index + window_len, dtype=torch.long).to(DEVICE)
 
 
 if __name__ == "__main__":
+
+	configs = Configurations({
+		Parameter.MODEL_NAME: "bert-base-uncased",
+		Parameter.MAX_TOKENS_NUMBER: 'all',
+		Parameter.LONGER_WORD_POLICY: 'ignore',
+	})
+		
 	# Loading the datasets
-	templates: Dataset = Dataset.from_csv('data/stereotyped-p/profession/templates-01.csv')
-	words: Dataset = get_dataset_from_words_csv('data/stereotyped-p/profession/words-01.csv')
+	templates: Dataset = Dataset.from_csv('data/properties/religion/templates-01.csv')
+	words: Dataset = Dataset.from_csv('data/properties/religion/words-01.csv')
 
-	# Creating the word embedder
-	word_embedder = WordEmbedder(select_templates='all', average_templates=False, average_tokens=False, discard_longer_words=True, max_tokens_number=2)
-
-	# Embedding a word
+	word_embedder = RawEmbedder(configs, PATTERN)
 	embedding_dataset = word_embedder.embed(words, templates)
-	print(f"Resulting embedding length:", len(embedding_dataset))
+
+	print("Resulting embedding dataset:", embedding_dataset)
+	print("Resulting embedding length:", len(embedding_dataset))

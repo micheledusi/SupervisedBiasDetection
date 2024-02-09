@@ -8,6 +8,7 @@
 # This module offers some utils functions for caching data.
 
 import warnings
+import torch
 from datasets import Dataset
 
 from data_processing.data_reference import BiasDataReference, PropertyDataReference
@@ -20,9 +21,8 @@ from model.binary_scoring.polarization.base import PolarizationScorer
 from model.binary_scoring.polarization.factory import PolarizationFactory
 from utils.caching.manager import CachedData
 from utils.config import Configurations
-from utils.const import *
-from model.embedding.word_embedder import WordEmbedder
-
+from utils.const import DEVICE
+from model.embedding.word_embedder import RawEmbedder, WordEmbedder
 
 
 def get_cached_embeddings(property: PropertyDataReference, configs: Configurations, rebuild: bool = False) -> Dataset:
@@ -46,7 +46,7 @@ def get_cached_embeddings(property: PropertyDataReference, configs: Configuratio
 		templates: Dataset = Dataset.from_csv(property.templates_file)
 		words: Dataset = get_dataset_from_words_csv(property.words_file)
 		# Creating the word embedder
-		word_embedder = WordEmbedder(configs, pattern=property.pattern)
+		word_embedder = WordEmbedder(configs)
 		# Embedding words
 		embedding_dataset = word_embedder.embed(words, templates)
 		embedding_dataset = embedding_dataset.with_format('torch', device=DEVICE)
@@ -61,6 +61,43 @@ def get_cached_embeddings(property: PropertyDataReference, configs: Configuratio
 	})
 
 	return CachedData(CachedDataType.EMBEDDINGS, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
+
+
+def get_cached_raw_embeddings(property: PropertyDataReference, configs: Configurations, rebuild: bool = False) -> Dataset:
+	"""
+	Creates and returns a dataset with the embeddings in the "raw" format.
+	The embeddings are cached, so that they are not computed again if the cache is not expired.
+
+	:param property: the property to use, a PropertyDataReference object with the following fields:
+		- name: the name of the property
+		- type: the type of the property. Must be "protected" or "stereotyped"
+		- words_file_id: the id of the words file to use. (e.g. 01, 02, etc.)
+		- templates_file_id: the id of the templates file to use. (e.g. 01, 02, etc.)
+	:param kwargs: the parameters for the WordEmbedder
+	"""
+	params = CachedDataType.RAW_EMBEDDINGS.get_relevant_configs(configs).to_strdict()
+
+	def create_embedding_fn() -> Dataset:
+		# Disabling annoying "FutureWarning" messages
+		warnings.simplefilter(action='ignore', category=FutureWarning)
+		# Loading the datasets
+		templates: Dataset = Dataset.from_csv(property.templates_file)
+		words: Dataset = get_dataset_from_words_csv(property.words_file)
+		# Creating the word embedder
+		word_embedder = RawEmbedder(configs)
+		# Embedding words
+		embedding_dataset = word_embedder.embed(words, templates)
+		return embedding_dataset
+
+	# Creating info for the cache
+	metadata: dict = params.copy()
+	metadata.update({
+		'property': property.name,
+		'input_words_file': property.words_file,
+		'input_templates_file': property.templates_file,
+	})
+
+	return CachedData(CachedDataType.RAW_EMBEDDINGS, metadata, creation_fn=create_embedding_fn, rebuild=rebuild).__enter__()
 
 
 def get_cached_crossing_scores(bias_reference: BiasDataReference, configs: Configurations, rebuild: bool = False) -> tuple[Dataset, Dataset, torch.Tensor]:

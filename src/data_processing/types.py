@@ -13,7 +13,7 @@
 
 from enum import Enum
 from typing import Type
-from data_processing.json import CrossingScoresJSONConverter, EmbeddingsJSONConverter, PolarizationScoresJSONConverter
+from data_processing.json import CrossingScoresJSONConverter, EmbeddingsJSONConverter, RawEmbeddingsJSONConverter, PolarizationScoresJSONConverter
 
 from utils.caching.stream import FileStream, JSONFileStream, PickleFileStream
 from utils.config import Configurations, Parameter
@@ -33,27 +33,34 @@ class CachedDataType(Enum):
 	EMBEDDINGS = "embeddings", \
 		(
 			Parameter.MODEL_NAME,
-			Parameter.TEMPLATES_SELECTED_NUMBER,
-			Parameter.AVERAGE_TEMPLATES,
+			Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE,
+			Parameter.TEMPLATES_POLICY,
 			Parameter.AVERAGE_TOKENS,
-			Parameter.DISCARD_LONGER_WORDS,
+			Parameter.LONGER_WORD_POLICY,
 			Parameter.MAX_TOKENS_NUMBER,
 		), \
 		JSONFileStream, EmbeddingsJSONConverter
+	RAW_EMBEDDINGS = "raw_embeddings", \
+		(
+			Parameter.MODEL_NAME,
+			Parameter.LONGER_WORD_POLICY,
+			Parameter.MAX_TOKENS_NUMBER,
+		), \
+		JSONFileStream, RawEmbeddingsJSONConverter
 	CROSSING_SCORES = "crossing_scores", \
 		(
 			Parameter.MODEL_NAME,
-			Parameter.DISCARD_LONGER_WORDS,
+			Parameter.LONGER_WORD_POLICY,
 			Parameter.MAX_TOKENS_NUMBER,
-			Parameter.CROSSING_STRATEGY,
+			Parameter.CROSS_PROBABILITY_STRATEGY,
 		), \
 		JSONFileStream, CrossingScoresJSONConverter
 	POLARIZATION_SCORES = "polarization_scores", \
 		(
 			Parameter.MODEL_NAME,
-			Parameter.DISCARD_LONGER_WORDS,
+			Parameter.LONGER_WORD_POLICY,
 			Parameter.MAX_TOKENS_NUMBER,
-			Parameter.CROSSING_STRATEGY,
+			Parameter.CROSS_PROBABILITY_STRATEGY,
 			Parameter.POLARIZATION_STRATEGY,
 		), \
 		JSONFileStream, PolarizationScoresJSONConverter

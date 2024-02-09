@@ -28,9 +28,9 @@ if __name__ == '__main__':
 	
 	configs = Configurations({
 		Parameter.MAX_TOKENS_NUMBER: 'all',
-		Parameter.TEMPLATES_SELECTED_NUMBER: 3,
+		Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 3,
 		Parameter.CLASSIFIER_TYPE: 'linear',
-		Parameter.CROSSING_STRATEGY: 'pppl',
+		Parameter.CROSS_PROBABILITY_STRATEGY: 'pppl',
 		Parameter.POLARIZATION_STRATEGY: 'difference',
 	})
 	property: PropertyDataReference = PropertyDataReference("religion", "protected", 2, 0)

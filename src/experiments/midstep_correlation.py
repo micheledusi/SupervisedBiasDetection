@@ -35,9 +35,9 @@ from deprecated import deprecated
 # Configurations to process data
 configurations = ConfigurationsGrid({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 'all',
 	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.CROSSING_STRATEGY: 'pppl',
+	Parameter.CROSS_PROBABILITY_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
 

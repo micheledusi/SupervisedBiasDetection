@@ -7,33 +7,77 @@
 
 # This module contains the launcher of the project
 
+from time import sleep
 import torch
-from datasets import disable_caching, logging
-from data_processing.data_reference import PropertyDataReference
+from datasets import Dataset, disable_caching as dataset_disable_caching
+from datasets.utils import logging as datasets_logging
+import logging
 
-from experiments.midstep_chi_squared import MidstepAnalysisChiSquared
-from utils.config import ConfigurationsGrid, Parameter
+from model.embedding.combinator import EmbeddingsCombinator
 
-# Libraries setup
+# Torch setup
 torch.manual_seed(42)
-disable_caching()
-logging.set_verbosity_error()
+torch.use_deterministic_algorithms(True)    # For reproducibility
+# Datasets setup
+dataset_disable_caching()
+datasets_logging.set_verbosity_error()
+datasets_logging.disable_progress_bar()
+# Logging setup
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+from data_processing.data_reference import PropertyDataReference
+from utils.caching.creation import get_cached_raw_embeddings
+from utils.config import ConfigurationsGrid, Parameter
+from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED
+
+
+REBUILD_DATASETS = False
 
 PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
 STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
-MIDSTEP: int = 62
 
-configurations = ConfigurationsGrid({
+
+# Raw embeddings computation
+configurations_raw_embeddings = ConfigurationsGrid({
+	Parameter.MODEL_NAME: [MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED],
 	Parameter.MAX_TOKENS_NUMBER: 'all',
-	Parameter.TEMPLATES_SELECTED_NUMBER: 'all',
-	Parameter.CLASSIFIER_TYPE: 'svm',
-	Parameter.REDUCTION_TYPE: 'pca',
-	Parameter.CENTER_EMBEDDINGS: False,
+	Parameter.LONGER_WORD_POLICY: 'truncate',
 })
+configurations_combined_embeddings = ConfigurationsGrid({
+	# Combining embeddings in single testcases
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.8, 0.9, 1.0],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.8, 0.9, 1.0],
+	Parameter.TEMPLATES_POLICY: 'average',
+	Parameter.MAX_TESTCASE_NUMBER: 1,
+	# Testcase post-processing
+	Parameter.CENTER_EMBEDDINGS: False,
+	# Reduction
+	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
+	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
+	# Bias evaluation
+	Parameter.CROSS_CLASSIFIER_TYPE: 'svm',
+	Parameter.BIAS_TEST : 'chi2',
+})
+
 
 if __name__ == "__main__":
 	# For every combination of parameters, run the experiment
-	for configs in configurations:
-		experiment = MidstepAnalysisChiSquared(configs)
-		experiment.run(prot_prop=PROTECTED_PROPERTY, ster_prop=STEREOTYPED_PROPERTY)
+	for configs_re in configurations_raw_embeddings:
+		logging.debug("Configurations for the raw embeddings computation:\n%s", configs_re)
+		
+		# Loading the datasets
+		protected_property_ds: Dataset = get_cached_raw_embeddings(PROTECTED_PROPERTY, configs_re, REBUILD_DATASETS)
+		stereotyped_property_ds: Dataset = get_cached_raw_embeddings(STEREOTYPED_PROPERTY, configs_re, REBUILD_DATASETS)
+
+		logging.debug(f"Resulting protected raw dataset for property \"{PROTECTED_PROPERTY.name}\":\n{protected_property_ds}")
+		logging.debug(f"Resulting stereotyped raw dataset for property \"{STEREOTYPED_PROPERTY.name}\":\n{stereotyped_property_ds}")
 	
+		# Combining the embeddings
+		combinator = EmbeddingsCombinator(configurations_combined_embeddings)
+
+		combined_protected_embeddings: dict = combinator.combine(protected_property_ds)
+		combined_stereotyped_embeddings: dict = combinator.combine(stereotyped_property_ds)
+
+		print(combined_protected_embeddings)
+
+		# TODO Average embeddings

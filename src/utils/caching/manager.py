@@ -10,12 +10,11 @@
 import copy
 from datetime import datetime
 import json
+import logging
 import os
 from typing import Any, Callable
-import pickle as pkl
 
 from data_processing.types import CachedDataType
-from utils.config import Configurations
 
 
 class CacheManager:
@@ -123,7 +122,7 @@ class CacheManager:
 			if not to_be_deleted:
 				register.append(entry)
 			else:
-				print("Removing old object from cache: ", entry['filename'])
+				logging.info("Removing old object from cache:%s", entry['filename'])
 				try:
 					datatype.filestream.delete(self._get_folder(datatype) + '/' + entry['filename'])
 
@@ -134,7 +133,7 @@ class CacheManager:
 					try:
 						datatype.filestream.delete(self._get_folder(datatype) + '/' + entry['filename'], extension='.pkl')
 					except FileNotFoundError:
-						print("WARNING: File not found in cache: ", entry['filename'])
+						logging.error("File not found in cache:%s", entry['filename'])
 
 		# "register" has now been cleaned from the corresponding objects (if any)
 		# Also, the corresponding files have been deleted from the cache.
@@ -259,15 +258,15 @@ class CachedData:
 	def __enter__(self):
 		if not self._rebuild and self._cacher.exists(self._datatype, self._metadata):
 			try:
-				print(f"Loading cached data of type: \"{self._datatype.value}\"")
+				logging.info(f"Loading cached data of type: \"{self._datatype.value}\"")
 				return self._cacher.load(self._datatype, self._metadata)
 			except FileNotFoundError as e:
-				print(f"File not found for cached data of type: \"{self._datatype.value}\": {e}")
+				logging.error(f"File not found for cached data of type: \"{self._datatype.value}\": {e}")
 		# Otherwise
 		if self._creation_fn is None:
 			raise NotImplemented("The creation function is not defined, and the object does not exist in the cache.")
 		else:
-			print(f"Creating data of type \"{self._datatype}\" from scratch and saving to the cache")
+			logging.info(f"Creating data of type \"{self._datatype}\" from scratch and saving to the cache")
 			data = self._creation_fn()
 			self._cacher.save(data, self._datatype, self._metadata)
 			return data

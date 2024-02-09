@@ -7,27 +7,16 @@
 
 # This module contains the constants used in the project.
 
-import torch
-
 # Filename and folder conventions
 # All paths are relative to the root of the project.
 FOLDER_DATA: str = "data"
 FOLDER_RESULTS: str = "results"
 FOLDER_CROSSED_EVALUATION: str = FOLDER_DATA + "/crossed-evaluation"
-FOLDER_PROTECTED_PROPERTY: str = FOLDER_DATA + "/protected-p"
-FOLDER_STEREOTYPED_PROPERTY: str = FOLDER_DATA + "/stereotyped-p"
 
 FILE_VALUES: str = "values"
 FILE_WORDS: str = "words"
 FILE_TEMPLATES: str = "templates"
 FILE_GENERATION: str = "sentence-generation"
-
-# Properties names
-PP_GENDER: str = "gender"
-PP_RELIGION: str = "religion"
-SP_PROFESSION: str = "profession"
-SP_QUALITY: str = "quality"
-SP_ACTION: str = "action"
 
 # Bert tokenization
 TOKEN_CLS: str = "[CLS]"
@@ -44,16 +33,19 @@ DEFAULT_MODEL_NAME: str = MODEL_NAME_BERT_BASE_UNCASED
 NUM_PROC: int = 1
 # DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"
 DEVICE: str = "cpu"
-torch.use_deterministic_algorithms(True)    # For reproducibility
 BATCH_SIZE = 32
 
-# Embedding configurations
-DEFAULT_TEMPLATES_SELECTED_NUMBER = 3
-DEFAULT_AVERAGE_TEMPLATES = True
-DEFAULT_AVERAGE_TOKENS = True
-DEFAULT_DISCARD_LONGER_WORDS = True
+# Embedding configurations - Raw embeddings computation
+DEFAULT_LONGER_WORD_POLICY = 'truncate' # 'truncate' or 'discard' or 'ignore'
 DEFAULT_MAX_TOKENS_NUMBER = 'all'
+# Embedding configurations - Templates and words sampling / Embeddings combination
+DEFAULT_TEMPLATES_SAMPLING_NUMBER = 3
+DEFAULT_WORDS_SAMPLING_NUMBER = 30
+DEFAULT_TEMPLATES_POLICY = 'average'
+DEFAULT_MAX_TESTCASE_NUMBER = 100
+# Embedding configurations - Testcase post-processing
 DEFAULT_CENTER_EMBEDDINGS = False
+
 DEFAULT_TEST_SPLIT_PERCENTAGE = 0.5
 
 # Reduction configurations
@@ -61,7 +53,7 @@ DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm' or 'linear'
 DEFAULT_REDUCTION_TYPE = 'pca' # 'pca' or 'tsne'
 
 # Crossed evaluation configurations
-DEFAULT_CROSSING_STRATEGY = 'pppl'	# 'pppl' or 'mlm'
+DEFAULT_CROSS_PROBABILITY_STRATEGY = 'pppl'	# 'pppl' or 'mlm'
 DEFAULT_POLARIZATION_STRATEGY = 'ratio'		# 'difference' or 'ratio'
 
 # Separation configurations
