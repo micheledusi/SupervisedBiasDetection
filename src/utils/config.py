@@ -25,7 +25,7 @@ class Parameter(Enum):
 	MODEL_NAME = "model_name", DEFAULT_MODEL_NAME, "MODEL"
 	""" The name of the Large Language Model from the Huggingface library. """
 	
-	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TK"
+	MAX_TOKENS_NUMBER = "max_tokens_number", DEFAULT_MAX_TOKENS_NUMBER, "TOK"
 	""" The maximum number of tokens to consider in a word. The value can be an integer or `all` to consider all the tokens. """
 	
 	LONGER_WORD_POLICY = "longer_word_policy", DEFAULT_LONGER_WORD_POLICY, "LWP"
@@ -33,7 +33,7 @@ class Parameter(Enum):
 	If `discard`, words with more tokens than the maximum number of tokens are discarded. 
 	If `truncate`, the tokens are truncated to the maximum number of tokens. """
 
-	AVERAGE_TOKENS = "average_tokens", True
+	AVERAGE_TOKENS = "average_tokens", True, "AVT"
 	"""	Whether to average the tokens of a word. I true, all the tokens obtained from the tokenization of a word are averaged.
 	@deprecated: this should be always set to True."""
 
@@ -46,7 +46,7 @@ class Parameter(Enum):
 	TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE = "templates_sampling_number", DEFAULT_TEMPLATES_SAMPLING_NUMBER, "TS"
 	""" The number of templates to sample from the dataset. If `all`, all the templates are used. """
 	
-	TEMPLATES_POLICY = "templates_policy", DEFAULT_TEMPLATES_POLICY
+	TEMPLATES_POLICY = "templates_policy", DEFAULT_TEMPLATES_POLICY, "TP"
 	""" The policy to use to combine the embeddings of the templates. 
 	If `average`, all the embeddings from the same word but different embeddings are averaged in one embedding.
 	If `distinct`, the embeddings of the same word are taken separately. """
@@ -267,7 +267,7 @@ class Configurations:
 
 		:return: The set of configurations as a string.
 		"""
-		return self.get_configurations_as_string()
+		return f"\033[36m{self.to_abbrstr()}\033[0m"
 	
 	def to_strdict(self) -> dict[str, Any]:
 		"""
