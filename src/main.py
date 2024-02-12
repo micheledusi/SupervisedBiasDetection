@@ -23,7 +23,7 @@ dataset_disable_caching()
 datasets_logging.set_verbosity_error()
 datasets_logging.disable_progress_bar()
 # Logging setup
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 from data_processing.data_reference import PropertyDataReference
 from utils.caching.creation import get_cached_raw_embeddings
@@ -33,8 +33,8 @@ from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, M
 
 REBUILD_DATASETS = False
 
-PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
+PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("profession", 1, 1)
 
 
 # Raw embeddings computation
@@ -45,10 +45,10 @@ configurations_raw_embeddings = ConfigurationsGrid({
 })
 configurations_combined_embeddings = ConfigurationsGrid({
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.8, 0.9, 1.0],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.8, 0.9, 1.0],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5, 1.0],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.8],
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 1,
+	Parameter.MAX_TESTCASE_NUMBER: 10,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
 	# Reduction
@@ -79,5 +79,4 @@ if __name__ == "__main__":
 		combined_stereotyped_embeddings: dict = combinator.combine(stereotyped_property_ds)
 
 		print(combined_protected_embeddings)
-
-		# TODO Average embeddings
+		print(combined_stereotyped_embeddings)

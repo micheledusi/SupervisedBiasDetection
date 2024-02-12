@@ -13,6 +13,7 @@ import logging
 import math
 import random
 from datasets import Dataset
+import torch
 
 from utils.config import Configurable, ConfigurationsGrid, Parameter
 
@@ -103,7 +104,33 @@ class EmbeddingsCombinator(Configurable):
                     
                 logging.debug(f"Selection by templates: selected {len(second_selection)} rows from the first selecton, with {selected_values} unique values")
 
-                testcases.append(second_selection)
+                # [3] Finally, if the policy is "average", we average the embeddings of the selected rows
+                if config[Parameter.TEMPLATES_POLICY] == "average":
+                    logging.info("Averaging the embeddings of the same word, for different templates")
+                    # We copy the features of the current dataset selection, but as an empty dataset
+                    final_selection: Dataset = second_selection.select([])
+                    # For each word in the dataset
+                    logging.debug("Sampled %d words", len(sampled_words))
+                    for word in sampled_words:
+                        word_selection: Dataset = second_selection.filter(lambda x: x['word'] == word)
+                        assert len(word_selection) > 0, f"The word '{word}' is not sampled in the second-selection dataset"
+                        final_selection = final_selection.add_item({
+                            "word": word,
+                            "value": word_selection['value'][0],
+                            "descriptor": word_selection['descriptor'][0],
+                            # "template": word_selection['template'], # We keep all the templates
+                            # "sentence": word_selection['sentence'], # We keep all the sentences for the word
+                            "embedding": torch.mean(word_selection['embedding'], dim=0).tolist(), # Averaging the embeddings on the first axis (=#templates)
+                        })
+                    logging.debug("Final selection size: %d", len(final_selection))
+                elif config[Parameter.TEMPLATES_POLICY] == "distinct":
+                    # Everything is already done
+                    final_selection: Dataset = second_selection
+                else:
+                    # Unknown policy
+                    raise ValueError(f"Unknown policy for the templates: {config[Parameter.TEMPLATES_POLICY]}")
+
+                testcases.append(final_selection)
 
             combined_embeddings[config] = testcases
         
