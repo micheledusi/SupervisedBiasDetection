@@ -50,7 +50,7 @@ class EmbeddingsCombinator(Configurable):
         - "word": the string of the word
         - "value": the value that the word represents w.r.t. the protected/stereotyped property
         - "embedding": the embedding of the word, as a torch.Tensor
-        Some datasets may contain additional fields, such as "template", "sentence" or "template" (if the policy is to keep the templates distinc).
+        Some datasets may contain additional fields, such as "descriptor", "sentence" or "template" (if the policy is to keep the templates distinct).
 
         :param raw_embeddings: the raw embeddings, as provided by the "RawEmbedder"
         :return: the combined embeddings
@@ -109,26 +109,39 @@ class EmbeddingsCombinator(Configurable):
                 if config[Parameter.TEMPLATES_POLICY] == "average":
                     logging.info("Averaging the embeddings of the same word, for different templates")
                     # We copy the features of the current dataset selection, but as an empty dataset
-                    final_selection: Dataset = second_selection.select([])
-                    # For each word in the dataset
+                    final_selection_dict: dict[str, list] = {}
+                    for key in second_selection.features:
+                        final_selection_dict[key] = []
                     logging.debug("Sampled %d words", len(sampled_words))
+                    # logging.debug("Sampled words: %s", sampled_words)
+
+                    # For each word in the dataset
                     for word in sampled_words:
                         word_selection: Dataset = second_selection.filter(lambda x: x['word'] == word)
+
+                        # If the word has not been sampled, we skip it
                         if len(word_selection) == 0:
                             logging.warning(f"The word '{word}' has not been sampled in the second-selection dataset. The resulting dataset will still work, but it will not contain the desired number of words.")
                             continue
-                        final_selection = final_selection.add_item({
-                            "word": word,
-                            "value": word_selection['value'][0],
-                            # "descriptor": word_selection['descriptor'][0], # Not all the datasets have the descriptor
-                            # "template": word_selection['template'], # We keep all the templates
-                            # "sentence": word_selection['sentence'], # We keep all the sentences for the word
-                            "embedding": torch.mean(word_selection['embedding'], dim=0).tolist(), # Averaging the embeddings on the first axis (=#templates)
-                        })
+
+                        for key in word_selection.features:
+                            if key == "word":
+                                final_selection_dict["word"].append(word)
+                            elif key == "value":
+                                final_selection_dict["value"].append(word_selection['value'][0])
+                            elif key == "descriptor":
+                                final_selection_dict["descriptor"].append(word_selection['descriptor'][0])
+                            elif key == "embedding":
+                                final_selection_dict["embedding"].append(torch.mean(word_selection['embedding'], dim=0).tolist())
+                            else:
+                                # For other keys, all the values are appended in one single block.
+                                final_selection_dict[key].append(word_selection[key])
+
+                    final_selection: Dataset = Dataset.from_dict(final_selection_dict).with_format("torch")
                     logging.debug("Final selection size: %d", len(final_selection))
                 elif config[Parameter.TEMPLATES_POLICY] == "distinct":
                     # Everything is already done
-                    final_selection: Dataset = second_selection.remove_columns("descriptor")
+                    final_selection: Dataset = second_selection
                 else:
                     # Unknown policy
                     raise ValueError(f"Unknown policy for the templates: {config[Parameter.TEMPLATES_POLICY]}")
