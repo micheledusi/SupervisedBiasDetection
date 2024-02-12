@@ -30,7 +30,7 @@ MODEL_NAME_DISTILBERT_BASE_UNCASED: str = "distilbert-base-uncased"
 DEFAULT_MODEL_NAME: str = MODEL_NAME_BERT_BASE_UNCASED
 
 # Configurations
-NUM_PROC: int = 1
+NUM_PROC: int = 4
 # DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"
 DEVICE: str = "cpu"
 BATCH_SIZE = 32
