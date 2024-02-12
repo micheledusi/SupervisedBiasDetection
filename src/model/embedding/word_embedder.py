@@ -10,6 +10,7 @@
 # The embedding is a vector of floats, instanced as a PyTorch tensor.
 # This process can be done in different ways, depending on what the user wants to do.
 
+import logging
 import random
 import re
 from deprecated import deprecated
@@ -379,7 +380,10 @@ class RawEmbedder(Configurable):
 			return batch
 		
 		# Applying the tokenization and filtering
+		logging.info(f"Tokenizing and filtering the words...")
 		words = words.map(tokenize_batch_of_words_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)
+		logging.info(f"Tokenizing and filtering the words... DONE")
+		logging.info(f"Resulting words dataset size: {len(words)}")
 		# Current columns in words dataset: ['word', 'value', 'descriptor'(optional), 'tokens', 'num_tokens']
 
 		# XXX: STEP 2 #
@@ -435,8 +439,11 @@ class RawEmbedder(Configurable):
 			return ds.to_dict()
 
 		# Getting the sentences for each word
+		logging.info(f"Creating the sentences for each word...")
 		word_with_sentences: Dataset = words.map(cross_batch_of_words_with_templates_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)\
 			.with_format('torch', device=DEVICE)
+		logging.info(f"Creating the sentences for each word... DONE")
+		logging.info(f"Resulting word_with_sentences dataset size: {len(word_with_sentences)}")
 		# Current columns in word_with_sentences dataset: ['word', 'value', 'descriptor', 'tokens', 'num_tokens', 'template', 'sentence']
 
 		# XXX: STEP 3 #
@@ -481,10 +488,13 @@ class RawEmbedder(Configurable):
 			return sentences_batch
 
 		# Embedding the words by applying the "embed_sentences_batch_fn" function
+		logging.info(f"Embedding the words...")
 		embeddings_ds = word_with_sentences\
 			.map(embed_sentences_batch_fn, batched=True, batch_size=BATCH_SIZE, num_proc=NUM_PROC)\
 				.remove_columns(['tokens', 'num_tokens'])\
 					.with_format('torch', device=DEVICE)
+		logging.info(f"Embedding the words... DONE")
+		logging.info(f"Resulting embedding dataset size: {len(embeddings_ds)}")
 
 		# Current columns in embeddings_ds dataset: ['word', 'value', 'descriptor', 'template', 'sentence', 'embedding']
 		return embeddings_ds
