@@ -50,6 +50,7 @@ class EmbeddingsCombinator(Configurable):
         - "word": the string of the word
         - "value": the value that the word represents w.r.t. the protected/stereotyped property
         - "embedding": the embedding of the word, as a torch.Tensor
+        Some datasets may contain additional fields, such as "template", "sentence" or "template" (if the policy is to keep the templates distinc).
 
         :param raw_embeddings: the raw embeddings, as provided by the "RawEmbedder"
         :return: the combined embeddings
@@ -113,11 +114,13 @@ class EmbeddingsCombinator(Configurable):
                     logging.debug("Sampled %d words", len(sampled_words))
                     for word in sampled_words:
                         word_selection: Dataset = second_selection.filter(lambda x: x['word'] == word)
-                        assert len(word_selection) > 0, f"The word '{word}' is not sampled in the second-selection dataset"
+                        if len(word_selection) == 0:
+                            logging.warning(f"The word '{word}' has not been sampled in the second-selection dataset. The resulting dataset will still work, but it will not contain the desired number of words.")
+                            continue
                         final_selection = final_selection.add_item({
                             "word": word,
                             "value": word_selection['value'][0],
-                            "descriptor": word_selection['descriptor'][0],
+                            # "descriptor": word_selection['descriptor'][0], # Not all the datasets have the descriptor
                             # "template": word_selection['template'], # We keep all the templates
                             # "sentence": word_selection['sentence'], # We keep all the sentences for the word
                             "embedding": torch.mean(word_selection['embedding'], dim=0).tolist(), # Averaging the embeddings on the first axis (=#templates)
@@ -125,7 +128,7 @@ class EmbeddingsCombinator(Configurable):
                     logging.debug("Final selection size: %d", len(final_selection))
                 elif config[Parameter.TEMPLATES_POLICY] == "distinct":
                     # Everything is already done
-                    final_selection: Dataset = second_selection
+                    final_selection: Dataset = second_selection.remove_columns("descriptor")
                 else:
                     # Unknown policy
                     raise ValueError(f"Unknown policy for the templates: {config[Parameter.TEMPLATES_POLICY]}")
