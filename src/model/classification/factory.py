@@ -6,6 +6,7 @@
 # - - - - - - - - - - - - - - - #
 
 from enum import Enum
+import logging
 from model.classification.base import AbstractClassifier
 
 from model.classification.linear import LinearClassifier
@@ -34,20 +35,33 @@ class ClassifierFactory:
 	"""
 	This class is a factory for classifiers.
 	"""
+
+	PHASE_REDUCTION = 'reduction'
+	PHASE_CROSS = 'cross'
+
 	def __init__(self) -> None:
 		raise NotImplementedError("This class cannot be instantiated.")
 
 	@staticmethod
-	def create(configs: Configurations) -> AbstractClassifier:
+	def create(configs: Configurations, phase: str=PHASE_REDUCTION) -> AbstractClassifier:
 		"""
 		This method creates a classifier, given a type and a set of arguments.
 		The type must be one of the following:
 		- 'linear': A linear classifier.
 		- 'svm': A support vector machine classifier.
 
-		:param type: The type of the classifier.
-		:param kwargs: The arguments to be passed to the classifier constructor.
+		:param configs: The configurations to use.
+		:param phase: The phase in which the classifier is being created. It can be either 'reduction' or 'cross'.
 		:return: The classifier.
 		"""
-		clf_type = ClassifierType(configs.get(Parameter.CLASSIFIER_TYPE, DEFAULT_CLASSIFIER_TYPE))
+		if phase == ClassifierFactory.PHASE_REDUCTION:
+			clf_type = ClassifierType(configs.get(Parameter.REDUCTION_CLASSIFIER_TYPE, DEFAULT_CLASSIFIER_TYPE))
+			logging.info("Creating a reduction classifier of type '%s'...", clf_type.value)
+		elif phase == ClassifierFactory.PHASE_CROSS:
+			clf_type = ClassifierType(configs.get(Parameter.CROSS_CLASSIFIER_TYPE, DEFAULT_CLASSIFIER_TYPE))
+			logging.info("Creating a cross-validation classifier of type '%s'...", clf_type.value)
+		else:
+			error_message = f"Invalid phase reference: '{phase}'"
+			logging.error(error_message)
+			raise ValueError(error_message)
 		return clf_type.get_instance()
