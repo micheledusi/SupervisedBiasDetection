@@ -269,6 +269,28 @@ class Configurations:
 		"""
 		return f"\033[36m{self.to_abbrstr()}\033[0m"
 	
+	def __eq__(self, __value: object) -> bool:
+		"""
+		Checks if two Configurations objects are equal.
+		Two configurations are equal if they have the same set of parameters and the same values for each parameter.
+		"""
+		if not isinstance(__value, Configurations):
+			return False
+		return self.__configs == __value.__configs
+	
+	def __ne__(self, __value: object) -> bool:
+		"""
+		Checks if two Configurations objects are different.
+		Two configurations are different if they have different set of parameters or different values for at least one parameter.
+		"""
+		return not self.__eq__(__value)
+	
+	def __hash__(self) -> int:
+		"""
+		Computes the hash of the Configurations object.
+		"""
+		return hash(frozenset(self.__configs.items()))
+	
 	def to_strdict(self) -> dict[str, Any]:
 		"""
 		Gets the set of configurations as a dictionary.
