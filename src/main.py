@@ -11,11 +11,12 @@ import torch
 from datasets import Dataset, disable_caching as dataset_disable_caching
 from datasets.utils import logging as datasets_logging
 import logging
+from model.embedding.center import EmbeddingCenterer
 
 from model.embedding.combinator import EmbeddingsCombinator
 
 # Logging setup
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # Torch setup
 torch.manual_seed(42)
 torch.use_deterministic_algorithms(True)    # For reproducibility
@@ -26,7 +27,7 @@ datasets_logging.disable_progress_bar()
 
 from data_processing.data_reference import PropertyDataReference
 from utils.caching.creation import get_cached_raw_embeddings
-from utils.config import ConfigurationsGrid, Parameter
+from utils.config import Configurations, ConfigurationsGrid, Parameter
 from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED
 
 
@@ -49,7 +50,7 @@ configurations_combined_embeddings = ConfigurationsGrid({
 	Parameter.TEMPLATES_POLICY: 'average',
 	Parameter.MAX_TESTCASE_NUMBER: 1,
 	# Testcase post-processing
-	Parameter.CENTER_EMBEDDINGS: False,
+	Parameter.CENTER_EMBEDDINGS: False,	# TODO Implement this
 	# Reduction
 	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
 	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
@@ -74,13 +75,19 @@ if __name__ == "__main__":
 		# Combining the embeddings
 		combinator = EmbeddingsCombinator(configurations_combined_embeddings)
 
-		combined_protected_embeddings: dict = combinator.combine(protected_property_ds)
-		combined_stereotyped_embeddings: dict = combinator.combine(stereotyped_property_ds)
+		combined_protected_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(protected_property_ds)
+		combined_stereotyped_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(stereotyped_property_ds)
 
-		print(combined_protected_embeddings)
-		print(combined_stereotyped_embeddings)
+		# Centering the embeddings
+		# For each configuration of the combined embeddings:
+		for key_configs in combined_protected_embeddings:
+			centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
+			# Centering the embeddings for each testcase
+			combined_protected_embeddings[key_configs] = [centerer.center(ds) for ds in combined_protected_embeddings[key_configs]]
+		for key_configs in combined_stereotyped_embeddings:
+			centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
+			# Centering the embeddings for each testcase
+			combined_stereotyped_embeddings[key_configs] = [centerer.center(ds) for ds in combined_stereotyped_embeddings[key_configs]]	
 
-		first_key = list(combined_protected_embeddings.keys())[0]
-		sample_dataset = combined_protected_embeddings[first_key][0].remove_columns(["embedding"])
-		for row in sample_dataset:
-			print(row)
+		# Now we have the combined embeddings, we can proceed with the bias detection
+		# TODO Implement the bias detection
