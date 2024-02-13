@@ -19,15 +19,19 @@ from utils import file_system as fs
 
 REBUILD = False
 
-PROTECTED_PROPERTY_KEY: str = "prot_prop"
-STEREOTYPED_PROPERTY_KEY: str = "ster_prop"
-MIDSTEP_KEY: str = "midstep"
-
 
 class Experiment:
 	"""
 	The base class for the experiments.
 	"""
+
+	PROTECTED_PROPERTY_KEY: str = "prot_prop"
+	STEREOTYPED_PROPERTY_KEY: str = "ster_prop"
+	PROTECTED_EMBEDDINGS_DATASETS_LIST_KEY: str = "prot_embs_ds_list"
+	STEREOTYPED_EMBEDDINGS_DATASETS_LIST_KEY: str = "ster_embs_ds_list"
+	MIDSTEP_KEY: str = "midstep"
+
+
 	def __init__(self, name: str, required_kwargs: list[str] = [], configs: Configurations = None):
 		"""
 		The initializer for the experiment class.
@@ -172,7 +176,7 @@ class Experiment:
 		:param kwargs: The arguments passed to the experiment.
 		:return: The protected property.
 		"""
-		return self._extract_value_from_kwargs(PROTECTED_PROPERTY_KEY, **kwargs)
+		return self._extract_value_from_kwargs(self.PROTECTED_PROPERTY_KEY, **kwargs)
 	
 	def _extract_stereotyped_property(self, **kwargs) -> PropertyDataReference:
 		"""
@@ -181,7 +185,7 @@ class Experiment:
 		:param kwargs: The arguments passed to the experiment.
 		:return: The stereotyped property.
 		"""
-		return self._extract_value_from_kwargs(STEREOTYPED_PROPERTY_KEY, **kwargs)
+		return self._extract_value_from_kwargs(self.STEREOTYPED_PROPERTY_KEY, **kwargs)
 	
 	def _extract_midstep(self, **kwargs) -> int:
 		"""
@@ -190,7 +194,7 @@ class Experiment:
 		:param kwargs: The arguments passed to the experiment.
 		:return: The midstep.
 		"""
-		return self._extract_value_from_kwargs(MIDSTEP_KEY, **kwargs)
+		return self._extract_value_from_kwargs(self.MIDSTEP_KEY, **kwargs)
 	
 	def _get_results_folder(self, configs: Configurations, prot_values: list | Dataset = None, ster_values: list | Dataset = None) -> str:
 		"""
