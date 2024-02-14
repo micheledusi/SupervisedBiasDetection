@@ -11,6 +11,7 @@ import torch
 from datasets import Dataset, disable_caching as dataset_disable_caching
 from datasets.utils import logging as datasets_logging
 import logging
+from experiments.dynamic_midstep import DynamicPipelineExperiment
 from model.embedding.center import EmbeddingCenterer
 
 from model.embedding.combinator import EmbeddingsCombinator
@@ -33,8 +34,10 @@ from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, M
 
 REBUILD_DATASETS = False
 
-PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)
+# PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)
+PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
 
 
 # Raw embeddings computation
@@ -45,12 +48,14 @@ configurations_raw_embeddings = ConfigurationsGrid({
 })
 configurations_combined_embeddings = ConfigurationsGrid({
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.1, 0.2, 0.3],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.4],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.3],
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 1,
+	Parameter.MAX_TESTCASE_NUMBER: 5,
 	# Testcase post-processing
-	Parameter.CENTER_EMBEDDINGS: False,	# TODO Implement this
+	Parameter.CENTER_EMBEDDINGS: False,
+})
+configurations_bias_detection = Configurations({
 	# Reduction
 	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
 	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
@@ -90,4 +95,18 @@ if __name__ == "__main__":
 			combined_stereotyped_embeddings[key_configs] = [centerer.center(ds) for ds in combined_stereotyped_embeddings[key_configs]]	
 
 		# Now we have the combined embeddings, we can proceed with the bias detection
-		# TODO Implement the bias detection
+		logging.info("Configurations for the raw embeddings computation:\n%s", configs_re)
+		for key_configs in combined_protected_embeddings:
+			logging.info("Configurations for the combined embeddings:\n%s", key_configs)
+
+			# We assume that the keys of the two dictionaries are the same
+			# Meaning that the configurations are the same for both the protected and the stereotyped property
+			protected_embs_ds_list: list[Dataset] = combined_protected_embeddings[key_configs]
+			stereotyped_embs_ds_list: list[Dataset] = combined_stereotyped_embeddings[key_configs]
+
+			experiment: DynamicPipelineExperiment = DynamicPipelineExperiment(configurations_bias_detection)
+			experiment.run(
+				prot_embs_ds_list=protected_embs_ds_list, 
+				ster_embs_ds_list=stereotyped_embs_ds_list
+				)
+		
