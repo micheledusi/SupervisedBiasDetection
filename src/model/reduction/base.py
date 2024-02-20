@@ -9,6 +9,7 @@
 
 import torch
 from abc import ABC, abstractmethod
+from datasets import Dataset
 
 VERBOSE = False
 
@@ -88,6 +89,20 @@ class BaseDimensionalityReducer(ABC):
 		results = self._reduction_transformation(embeddings)
 		self.__check_output(results)
 		return results
+	
+	def reduce_ds(self, dataset: Dataset, input_column: str='embedding', output_column: str='embedding') -> Dataset:
+		"""
+		Applies the reduction to the embeddings contained in the given dataset.
+		The input column will be removed, and a new column with the reduced embeddings will be added.
+
+		:param dataset: The dataset containing the embeddings.
+		:param input_column: The name of the column containing the embeddings.
+		:param output_column: The name of the column where the reduced embeddings will be stored. If the column already exists, it will be overwritten.
+		:return: The dataset with the reduced embeddings.
+		"""
+		embeddings = dataset[input_column]
+		reduced_embeddings = self.reduce(embeddings)
+		return dataset.remove_columns(input_column).add_column(output_column, reduced_embeddings.tolist())
 
 	@abstractmethod
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:

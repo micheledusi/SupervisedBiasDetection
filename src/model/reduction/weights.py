@@ -26,7 +26,9 @@ class SelectorReducer(BaseDimensionalityReducer):
 		:param input_features: The number of features of the input embeddings.
 		:param indices: The selected indices for the output features.
 		"""
-		super().__init__(input_features, len(indices.squeeze()))
+		if indices.shape[-1] > 1:
+			indices = indices.squeeze()
+		super().__init__(input_features, len(indices))
 		self._selected_features = indices.to(DEVICE)
 
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:

@@ -17,7 +17,7 @@ from model.embedding.center import EmbeddingCenterer
 from model.embedding.combinator import EmbeddingsCombinator
 
 # Logging setup
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # Torch setup
 torch.manual_seed(42)
 torch.use_deterministic_algorithms(True)    # For reproducibility
@@ -37,7 +37,9 @@ REBUILD_DATASETS = False
 # PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)
 PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
+# PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
 
 
 # Raw embeddings computation
@@ -48,10 +50,10 @@ configurations_raw_embeddings = ConfigurationsGrid({
 })
 configurations_combined_embeddings = ConfigurationsGrid({
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.3],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.9],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.9],
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 5,
+	Parameter.MAX_TESTCASE_NUMBER: 20,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
 })
@@ -98,6 +100,7 @@ if __name__ == "__main__":
 		logging.info("Configurations for the raw embeddings computation:\n%s", configs_re)
 		for key_configs in combined_protected_embeddings:
 			logging.info("Configurations for the combined embeddings:\n%s", key_configs)
+			print(f"Configurations for the combined embeddings:\n{key_configs}")
 
 			# We assume that the keys of the two dictionaries are the same
 			# Meaning that the configurations are the same for both the protected and the stereotyped property

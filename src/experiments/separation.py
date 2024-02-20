@@ -8,25 +8,20 @@
 # EXPERIMENT: Measuring separation between classes at the end of the dimensionality reduction process.
 # DATE: 2023-07-12
 
-import os
-from datasets import Dataset, DatasetDict
+from datasets import Dataset
 import datasets
-import torch
 from tqdm import tqdm
 
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.factory import ClassifierFactory
 from model.embedding.center import EmbeddingCenterer
+from model.embedding.disconnection import DisconnectionScorer, cosine_distance, euclidean_distance
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.config import Configurations, Parameter
 
 MIDSTEPS: list[int] = list(range(2, 768+1))		# The list of midstep values for which the separation metrics will be computed
-
-# Separation metrics constants:
-ALPHA_SEPARATION_COEFFICIENT: float = 1.0
-BETA_COMPACTNESS_COEFFICIENT: float = 1.0
 
 
 class SeparationExperiment(Experiment):
@@ -53,19 +48,6 @@ class SeparationExperiment(Experiment):
 		embeddings_ds = embeddings_ds.add_column('labeled_value', embeddings_ds['value'])
 		embeddings_ds = embeddings_ds.class_encode_column('labeled_value')
 
-		if self.configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'cosine':
-			# We need to center the embeddings
-			if self.configs[Parameter.CENTER_EMBEDDINGS]:
-				centerer: EmbeddingCenterer = EmbeddingCenterer(self.configs)
-				embeddings_ds = centerer.center(embeddings_ds)
-			else:
-				raise ValueError("Cosine distance requires centered embeddings.")
-			self._distance_fn = cosine_distance
-		elif self.configs[Parameter.EMBEDDINGS_DISTANCE_STRATEGY] == 'euclidean':
-			self._distance_fn = euclidean_distance
-		else:
-			raise ValueError("Invalid distance strategy.")
-
 		### [1] 
 		# We apply the dimensionality reduction step:
 		reduced_embeddings_ds: Dataset = self._reduce(self.configs, self.midstep, embeddings_ds)
@@ -82,9 +64,11 @@ class SeparationExperiment(Experiment):
 
 		### [2] 
 		# We compute the separation metrics:
-		separation_score: float = self._compute_separation_score(reduced_embeddings_ds, "value", "embedding")
-		compactness_score: float = self._compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
-		score: float = separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT
+		scorer:	DisconnectionScorer = DisconnectionScorer(self.configs)
+
+		separation_score: float = scorer.compute_separation_score(reduced_embeddings_ds, "value", "embedding")
+		compactness_score: float = scorer.compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
+		score: float = separation_score / compactness_score * DisconnectionScorer.DISCONNECTION_COEFFICIENT
 		print(f"\nSeparation score: {separation_score}")
 		print(f"Compactness score: {compactness_score}")
 		print(f"\nFinal score: {score}")
@@ -98,12 +82,12 @@ class SeparationExperiment(Experiment):
 
 		for n in tqdm(MIDSTEPS):
 			reduced_embeddings_ds: Dataset = self._reduce(self.configs, n, embeddings_ds)
-			separation_score: float = self._compute_separation_score(reduced_embeddings_ds, "value", "embedding")
-			compactness_score: float = self._compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
+			separation_score: float = scorer.compute_separation_score(reduced_embeddings_ds, "value", "embedding")
+			compactness_score: float = scorer.compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
 
 			scores_sep.append(separation_score)
 			scores_comp.append(compactness_score)
-			scores.append(separation_score / compactness_score * ALPHA_SEPARATION_COEFFICIENT / BETA_COMPACTNESS_COEFFICIENT)
+			scores.append(separation_score / compactness_score * DisconnectionScorer.DISCONNECTION_COEFFICIENT)
 
 		results: Dataset = Dataset.from_dict({
 			"n": MIDSTEPS,
@@ -113,58 +97,6 @@ class SeparationExperiment(Experiment):
 			})
 		results.to_csv(folder + f'/separation_scores_{configs_descriptor}.csv', index=False)
 
-
-	def _compute_separation_score(self, embeddings: Dataset, class_col: str, coords_col: str) -> float:
-		"""
-		Computes the separation score of the given embeddings.
-
-		:param embeddings: The embeddings to analyze, as a Dataset.
-		:param class_col: The name of the column containing the class labels.
-		:param coords_col: The name of the column containing the coordinates of the embeddings, as torch tensors.
-		:return: The separation score of the given embeddings, as the
-		 		 average pairwise euclidean distance between inter-class embeddings.
-		"""
-		classes: list[str] = embeddings[class_col] # The list of classes
-		coords: torch.Tensor = embeddings[coords_col] # The coordinates of the embeddings
-		assert len(classes) == len(coords), "The number of classes and the number of embeddings must be the same."
-		size: int = len(classes)
-
-		distances: list[float] = []
-		for i in range(size):
-			for j in range(size):
-				if i == j:
-					continue
-				# We need to check distance only between embeddings of different classes
-				if classes[i] != classes[j]:
-					dist: float = self._distance_fn(coords[i], coords[j]).item()
-					distances.append(dist)
-		return sum(distances) / len(distances)
-
-	def _compute_compactness_score(self, embeddings: Dataset, class_col: str, coords_col: str) -> float:
-		"""
-		Computes the compactness score of the given embeddings.
-
-		:param embeddings: The embeddings to analyze, as a Dataset.
-		:param class_col: The name of the column containing the class labels.
-		:param coords_col: The name of the column containing the coordinates of the embeddings, as torch tensors.
-		:return: The compactness score of the given embeddings, as the
-		 		 average pairwise euclidean distance between intra-class embeddings.
-		"""
-		classes: list[str] = embeddings[class_col]
-		coords: torch.Tensor = embeddings[coords_col]
-		assert len(classes) == len(coords), "The number of classes and the number of embeddings must be the same."
-		size: int = len(classes)
-
-		distances: list[float] = []
-		for i in range(size):
-			for j in range(size):
-				if i == j:
-					continue
-				# We need to check distance only between embeddings of the same class
-				if classes[i] == classes[j]:
-					dist: float = self._distance_fn(coords[i], coords[j]).item()
-					distances.append(dist)
-		return sum(distances) / len(distances)
 
 	def _reduce(self, configs: Configurations, midstep: int, embs_dataset: Dataset, embs_column: str = "embedding") -> Dataset:
 		"""
@@ -188,18 +120,3 @@ class SeparationExperiment(Experiment):
 		result_ds: Dataset = embs_dataset.remove_columns(embs_column)
 		result_ds = result_ds.add_column("embedding", reduced_embs.tolist())
 		return result_ds.with_format("torch")
-	
-
-def euclidean_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-	"""
-	Computes the euclidean distance between the two given tensors.
-	"""
-	return torch.dist(x, y, p=2)
-
-
-def cosine_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-	"""
-	Computes the cosine distance between the two given tensors.
-	The result is 1 - cosine_similarity.
-	"""
-	return 1 - torch.cosine_similarity(x, y, dim=0)

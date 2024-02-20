@@ -99,3 +99,70 @@ class ChiSquaredTest:
 			print(f"p-value: {p_value}")
 		
 		return chi_squared.item(), p_value
+	
+
+class FisherCombinedProbabilityTest:
+	"""
+	Performs the Fisher's combined probability test.
+	"""
+
+	def __init__(self) -> None:
+		pass
+
+	def test(self, p_values: torch.Tensor) -> tuple[float, float, float]:
+		"""
+		Performs the Fisher's combined probability test on the given p-values. 
+		This method is typically applied to a collection of independent test statistics, 
+		usually from separate studies having the same null hypothesis. 
+
+		The Fisher's method combines the original p-values into one statistic (X^2), 
+		which has a chi-squared distribution with 2k degrees of freedom, 
+		where k is the number of original p-values.
+		The formula to compute the combined p-value is:
+		X^2 = -2 * sum(ln(p_i))
+
+		The null hypothesis of the combined test is that all the original null hypotheses are true.
+		Rejecting the null hypothesis  of the combined test means that at least one of the original null hypotheses is rejected, 
+		meaning that at least one of the original tests is significant.
+
+		:param p_values: The p-values to combine.
+		:return: The combined results: X^2, the degrees of freedom, and the p-value of the combined test.
+		"""
+		# Compute the combined statistic
+		combined_statistic = -2 * torch.sum(torch.log(p_values))
+		# Compute the degrees of freedom
+		degrees_of_freedom = 2 * len(p_values)
+		# Compute the combined p-value
+		combined_p_value = stats.distributions.chi2.sf(combined_statistic, degrees_of_freedom)
+		return combined_statistic.item(), degrees_of_freedom, combined_p_value
+	
+
+class HarmonicMeanPValue():
+	"""
+	Computes the harmonic mean of the p-values.
+	This is a statistical technique to combine the p-values of multiple tests.
+
+	The weighted harmonic mean is defined as:
+	H = sum_{i=1}^{n} w_i / sum_{i=1}^{n} w_i / p_i
+	where w_i is the weight of the i-th p-value.
+
+	When the weights are all equal, the harmonic mean is:
+	H = n / sum_{i=1}^{n} 1 / p_i
+	"""
+
+	def __init__(self) -> None:
+		pass
+
+	def test(self, p_values: torch.Tensor, weights: torch.Tensor=None) -> float:
+		"""
+		Computes the harmonic mean of the given p-values.
+
+		:param p_values: The p-values to combine.
+		:param weights: The weights of the p-values. If not specified, the weights are all equal to 1/n.
+		:return: The harmonic mean of the p-values.
+		"""
+		if weights is None:
+			weights = torch.ones_like(p_values) / len(p_values)
+		# Compute the harmonic mean
+		harmonic_mean = torch.sum(weights) / torch.sum(weights / p_values)
+		return harmonic_mean.item()

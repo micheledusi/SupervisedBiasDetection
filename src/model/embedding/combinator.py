@@ -14,6 +14,7 @@ import math
 import random
 from datasets import Dataset
 import torch
+from tqdm import tqdm
 
 from utils.config import Configurable, ConfigurationsGrid, Parameter
 
@@ -71,7 +72,7 @@ class EmbeddingsCombinator(Configurable):
             # Sampling the dataset
             # [1] First, we sample the words
             testcases: list = []
-            for _ in range(config[Parameter.MAX_TESTCASE_NUMBER]):
+            for _ in tqdm(range(config[Parameter.MAX_TESTCASE_NUMBER]), desc="Sampling testcases"):
 
                 # We must check if the dataset has enough values to be used in the experiment
                 selected_values = 0
