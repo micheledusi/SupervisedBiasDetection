@@ -134,3 +134,6 @@ results/
 
 # Utility (local) scripts
 *.sh
+
+# Auxiliary results files
+results_2024*.txt
