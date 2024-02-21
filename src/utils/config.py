@@ -73,9 +73,9 @@ class Parameter(Enum):
 	""" The classifier to use to produce the contingency table, which crosses the protected and stereotyped words.
 	Possible values are `svm` and `linear`. """
 
-	BIAS_TEST = "bias_test", "chi2", "BiTS"
+	BIAS_TEST = "bias_test", DEFAULT_BIAS_TEST, "BiTS"
 	""" The statistical test to use to detect the bias on the contingency table.
-	If `chi_squared`, the chi-squared test is used to detect the bias. """ # Note: this is the only strategy available at the moment.
+	If `chi2`, the chi-squared test is used to detect the bias. """ # Note: this is the only strategy available at the moment.
 
 	# Other parameters
 	TEST_SPLIT_PERCENTAGE = "test_split_percentage", DEFAULT_TEST_SPLIT_PERCENTAGE, "SP"

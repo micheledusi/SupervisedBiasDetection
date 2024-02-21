@@ -51,6 +51,7 @@ DEFAULT_TEST_SPLIT_PERCENTAGE = 0.5
 # Reduction configurations
 DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm' or 'linear'
 DEFAULT_REDUCTION_TYPE = 'pca' # 'pca' or 'tsne'
+DEFAULT_BIAS_TEST = 'chi2' # only 'chi2' for now
 
 # Crossed evaluation configurations
 DEFAULT_CROSS_PROBABILITY_STRATEGY = 'pppl'	# 'pppl' or 'mlm'
