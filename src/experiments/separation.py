@@ -15,11 +15,10 @@ from tqdm import tqdm
 from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.factory import ClassifierFactory
-from model.embedding.center import EmbeddingCenterer
-from model.embedding.cluster_validator import ClusteringScorer, cosine_distance, euclidean_distance
+from model.embedding.cluster_validator import ClusteringScorer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.config import Configurations, Parameter
+from utils.config import Configurations
 
 MIDSTEPS: list[int] = list(range(2, 768+1))		# The list of midstep values for which the separation metrics will be computed
 
