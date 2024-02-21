@@ -35,7 +35,6 @@ class CachedDataType(Enum):
 			Parameter.MODEL_NAME,
 			Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE,
 			Parameter.TEMPLATES_POLICY,
-			Parameter.AVERAGE_TOKENS,
 			Parameter.LONGER_WORD_POLICY,
 			Parameter.MAX_TOKENS_NUMBER,
 		), \
@@ -71,7 +70,7 @@ class CachedDataType(Enum):
 		obj._defining_parameters_ = defining_parameters if isinstance(defining_parameters, tuple) else tuple(defining_parameters)
 		if not filestream_csl:
 			raise ValueError("The filestream for the type of data '{}' is not defined.".format(value))
-		obj._filestream_cls_: Type[FileStream] = filestream_csl
+		obj._filestream_cls_ = filestream_csl
 		obj._filestream_args_ = filestream_args
 		# The filestream class must offer a constructor with the following signature:
 		# __init__(configs: Configurations, *args)

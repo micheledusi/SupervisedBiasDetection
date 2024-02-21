@@ -66,7 +66,8 @@ class WordEmbedder:
 
 		# Whether to average the embeddings of each token or not, for a single word
 		# Note: we don't know in advance if the word will be split into multiple tokens
-		self.average_tokens = configs.get(Parameter.AVERAGE_TOKENS)
+		# DEPRECATED: self.average_tokens = configs.get(Parameter.AVERAGE_TOKENS) # XXX: This parameter is deprecated
+		self.average_tokens = True
 		
 		# The maximum number of tokens to consider for each word
 		# If the value is "-1", all the tokens will be considered

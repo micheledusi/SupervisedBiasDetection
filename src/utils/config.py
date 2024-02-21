@@ -33,10 +33,6 @@ class Parameter(Enum):
 	If `discard`, words with more tokens than the maximum number of tokens are discarded. 
 	If `truncate`, the tokens are truncated to the maximum number of tokens. """
 
-	AVERAGE_TOKENS = "average_tokens", True, "AVT"
-	"""	Whether to average the tokens of a word. I true, all the tokens obtained from the tokenization of a word are averaged.
-	@deprecated: this should be always set to True."""
-
 	# Embeddings combination in testcases
 
 	WORDS_SAMPLING_PERCENTAGE = "words_sampling_number", DEFAULT_WORDS_SAMPLING_NUMBER, "WS"
