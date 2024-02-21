@@ -16,7 +16,7 @@ from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.factory import ClassifierFactory
 from model.embedding.center import EmbeddingCenterer
-from model.embedding.disconnection import DisconnectionScorer, cosine_distance, euclidean_distance
+from model.embedding.cluster_validator import ClusteringScorer, cosine_distance, euclidean_distance
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.config import Configurations, Parameter
@@ -64,11 +64,11 @@ class SeparationExperiment(Experiment):
 
 		### [2] 
 		# We compute the separation metrics:
-		scorer:	DisconnectionScorer = DisconnectionScorer(self.configs)
+		scorer:	ClusteringScorer = ClusteringScorer(self.configs)
 
 		separation_score: float = scorer.compute_separation_score(reduced_embeddings_ds, "value", "embedding")
 		compactness_score: float = scorer.compute_compactness_score(reduced_embeddings_ds, "value", "embedding")
-		score: float = separation_score / compactness_score * DisconnectionScorer.DISCONNECTION_COEFFICIENT
+		score: float = separation_score / compactness_score * ClusteringScorer.CLUSTERING_COEFFICIENT
 		print(f"\nSeparation score: {separation_score}")
 		print(f"Compactness score: {compactness_score}")
 		print(f"\nFinal score: {score}")
@@ -87,7 +87,7 @@ class SeparationExperiment(Experiment):
 
 			scores_sep.append(separation_score)
 			scores_comp.append(compactness_score)
-			scores.append(separation_score / compactness_score * DisconnectionScorer.DISCONNECTION_COEFFICIENT)
+			scores.append(separation_score / compactness_score * ClusteringScorer.CLUSTERING_COEFFICIENT)
 
 		results: Dataset = Dataset.from_dict({
 			"n": MIDSTEPS,

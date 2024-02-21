@@ -10,7 +10,7 @@
 
 from enum import Enum
 import logging
-from colorist import Effect
+from colorist import Color, Effect
 from datasets import Dataset
 import torch
 from tqdm import tqdm
@@ -19,9 +19,9 @@ from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.chi import ChiSquaredTest, FisherCombinedProbabilityTest, HarmonicMeanPValue
 from model.classification.factory import ClassifierFactory
-from model.embedding.disconnection import DisconnectionScorer
+from model.embedding.cluster_validator import ClusteringScorer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.config import Configurations
+from utils.config import Configurations, Parameter
 
 EMB_COL: str = "embedding"
 
@@ -63,7 +63,7 @@ class DynamicPipelineExperiment(Experiment):
 		# Phase 1: the reduction step
 		reduced_embs_ds_by_strategy: dict[ReductionStrategy, list[tuple[Dataset, Dataset]]] = {strategy: [] for strategy in ReductionStrategy}
 
-		for prot_embs_ds, ster_embs_ds in tqdm(zip(prot_embs_ds_list, ster_embs_ds_list), desc="Reduction step"):
+		for prot_embs_ds, ster_embs_ds in tqdm(zip(prot_embs_ds_list, ster_embs_ds_list), desc="Reduction step", total=len(prot_embs_ds_list)):
 			reduction_results = self._execute_reduction(prot_embs_ds, ster_embs_ds)
 			# We append the results to the list of datasets for each strategy
 			for strategy, reduced_embs_ds in reduction_results.items():
@@ -71,7 +71,8 @@ class DynamicPipelineExperiment(Experiment):
 		
 		# Phase 2: crossing the protected embeddings with the stereotyped embeddings to measure the bias
 		for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
-			print(f"******************************************************\nStrategy: {strategy}")
+			print("******************************************************")
+			print(f"{Color.GREEN}Strategy: {strategy}{Color.OFF}")
 			self._execute_crossing(reduced_embs_ds_list)
 
 
@@ -124,13 +125,24 @@ class DynamicPipelineExperiment(Experiment):
 		logging.debug(f"Relevance shape: {relevance.shape}")
 		possible_n_values = range(1, prot_embs_ds[EMB_COL].shape[-1] + 1)
 		logging.debug(f"Possible N values: {possible_n_values}")
-		scorer: DisconnectionScorer = DisconnectionScorer(self.configs)
-		results = {n: self._compute_separation_score(prot_embs_ds, n, relevance, scorer) for n in possible_n_values}
+		scorer: ClusteringScorer = ClusteringScorer(self.configs)
+		results = {n: self._compute_clustering_score(prot_embs_ds, n, relevance, scorer) for n in possible_n_values}
+		
+		# # DEBUG
+		# x = list(results.keys())
+		# y = list(results.values())
+		# import matplotlib.pyplot as plt
+		# fig, ax = plt.subplots()
+		# ax.plot(x, y)
+		# ax.set(xlabel='N', ylabel='Separation score', title='Separation score for different values of N')
+		# ax.grid()
+		# plt.show()
+
 		best_n = max(results, key=results.get)
 		return best_n
 
 	
-	def _compute_separation_score(self, prot_embs_ds: Dataset, n: int, relevance: torch.Tensor, scorer: DisconnectionScorer) -> float:
+	def _compute_clustering_score(self, prot_embs_ds: Dataset, n: int, relevance: torch.Tensor, scorer: ClusteringScorer) -> float:
 		"""
 		Computes the separation score for the given value of N.
 		The higher the score, the more the embeddings are separated in classes.
@@ -143,7 +155,7 @@ class DynamicPipelineExperiment(Experiment):
 		"""
 		reducer = WeightsSelectorReducer.from_weights(relevance, n)
 		reduced_prot_embs_ds = reducer.reduce_ds(prot_embs_ds)
-		return scorer.compute_disconnection_score(reduced_prot_embs_ds, "value", EMB_COL)
+		return scorer.compute_clustering_score(reduced_prot_embs_ds, "value", EMB_COL)
 
 
 	def _compute_relevance(self, prot_embs_ds: Dataset) -> torch.Tensor:

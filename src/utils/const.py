@@ -58,3 +58,7 @@ DEFAULT_POLARIZATION_STRATEGY = 'ratio'		# 'difference' or 'ratio'
 
 # Separation configurations
 DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY = 'euclidean'	# 'euclidean' or 'cosine'
+
+# Columns names in the datasets
+COL_CLASS: str = "value"
+COL_EMBS: str = "embedding"

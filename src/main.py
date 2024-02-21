@@ -37,9 +37,9 @@ REBUILD_DATASETS = False
 # PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)
 PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
-# STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
 # PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
 
 
 # Raw embeddings computation
@@ -50,10 +50,10 @@ configurations_raw_embeddings = ConfigurationsGrid({
 })
 configurations_combined_embeddings = ConfigurationsGrid({
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.9],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.9],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [1],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [1],
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 20,
+	Parameter.MAX_TESTCASE_NUMBER: 1,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
 })
