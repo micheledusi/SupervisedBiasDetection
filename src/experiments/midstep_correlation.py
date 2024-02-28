@@ -27,16 +27,16 @@ from model.reduction.composite import CompositeReducer
 from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.caching.creation import get_cached_polarization_scores
-from utils.config import Configurations, ConfigurationsGrid, Parameter
+from utils.config import Configurations, Parameter
 from utils.const import DEVICE
 from deprecated import deprecated
 
 
 # Configurations to process data
-configurations = ConfigurationsGrid({
+configurations = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 'all',
-	Parameter.CLASSIFIER_TYPE: 'svm',
+	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
 	Parameter.CROSS_PROBABILITY_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })

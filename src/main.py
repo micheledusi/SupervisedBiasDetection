@@ -28,7 +28,7 @@ datasets_logging.disable_progress_bar()
 
 from data_processing.data_reference import PropertyDataReference
 from utils.caching.creation import get_cached_raw_embeddings
-from utils.config import Configurations, ConfigurationsGrid, Parameter
+from utils.config import Configurations, Parameter
 from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED
 
 
@@ -42,22 +42,18 @@ STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
 
 
-# Raw embeddings computation
-configurations_raw_embeddings = ConfigurationsGrid({
-	Parameter.MODEL_NAME: [MODEL_NAME_BERT_BASE_UNCASED],
+configs = Configurations({
+	# Raw embeddings computation
+	Parameter.MODEL_NAME: [MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED],
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.LONGER_WORD_POLICY: 'truncate',
-})
-configurations_combined_embeddings = ConfigurationsGrid({
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [1],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [1],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5, 0.8],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.3],
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 1,
+	Parameter.MAX_TESTCASE_NUMBER: 2,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
-})
-configurations_bias_detection = Configurations({
 	# Reduction
 	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
 	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
@@ -69,8 +65,9 @@ configurations_bias_detection = Configurations({
 
 if __name__ == "__main__":
 	# For every combination of parameters, run the experiment
-	for configs_re in configurations_raw_embeddings:
-		logging.debug("Configurations for the raw embeddings computation:\n%s", configs_re)
+	for configs_re in configs.iterate_over(Configurations.ParametersSelection.RAW_EMBEDDINGS_COMPUTATION):
+
+		print(f"Running the experiment with the following configurations:\n{configs_re}")
 		
 		# Loading the datasets
 		protected_property_ds: Dataset = get_cached_raw_embeddings(PROTECTED_PROPERTY, configs_re, REBUILD_DATASETS)
@@ -80,7 +77,7 @@ if __name__ == "__main__":
 		logging.debug(f"Resulting stereotyped raw dataset for property \"{STEREOTYPED_PROPERTY.name}\":\n{stereotyped_property_ds}")
 	
 		# Combining the embeddings
-		combinator = EmbeddingsCombinator(configurations_combined_embeddings)
+		combinator = EmbeddingsCombinator(configs_re)
 
 		combined_protected_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(protected_property_ds)
 		combined_stereotyped_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(stereotyped_property_ds)
@@ -97,17 +94,14 @@ if __name__ == "__main__":
 			combined_stereotyped_embeddings[key_configs] = [centerer.center(ds) for ds in combined_stereotyped_embeddings[key_configs]]	
 
 		# Now we have the combined embeddings, we can proceed with the bias detection
-		logging.info("Configurations for the raw embeddings computation:\n%s", configs_re)
 		for key_configs in combined_protected_embeddings:
-			logging.info("Configurations for the combined embeddings:\n%s", key_configs)
-			print(f"Configurations for the combined embeddings:\n{key_configs}")
 
 			# We assume that the keys of the two dictionaries are the same
 			# Meaning that the configurations are the same for both the protected and the stereotyped property
 			protected_embs_ds_list: list[Dataset] = combined_protected_embeddings[key_configs]
 			stereotyped_embs_ds_list: list[Dataset] = combined_stereotyped_embeddings[key_configs]
 
-			experiment: DynamicPipelineExperiment = DynamicPipelineExperiment(configurations_bias_detection)
+			experiment: DynamicPipelineExperiment = DynamicPipelineExperiment(key_configs)
 			experiment.run(
 				prot_embs_ds_list=protected_embs_ds_list, 
 				ster_embs_ds_list=stereotyped_embs_ds_list

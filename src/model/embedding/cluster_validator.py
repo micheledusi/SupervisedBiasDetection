@@ -90,6 +90,11 @@ class ClusteringScorer(Configurable):
 				else:
 					# Otherwise, if the embedding [j] belongs to a different class than the reference embedding [i]
 					inter_class_distances[current_ref_class].append(dist)
+		for c in unique_classes:
+			if len(intra_class_distances[c]) == 0:
+				# This means that there is only one embedding for the class, thus we cannot pick a pair of embeddings for which to compute the distance
+				# We set the intra-class distance to 0
+				intra_class_distances[c].append(0)
 
 		dunn_indices: list[float] = []
 		# For each cluster (=class)
@@ -100,6 +105,8 @@ class ClusteringScorer(Configurable):
 			# We compute the average distance within the cluster
 			max_diameter = max(intra_class_distances[c])
 			# FIXME: UNUSED :: avg_diameter = sum(intra_class_distances[c]) / len(intra_class_distances[c])
+			if max_diameter == 0:
+				raise ValueError("The method is not computable: found a class with size = 1, which makes the computation of the diameter impossible.")
 			# We compute the Dunn index for the cluster
 			dunn_index = min_separation / max_diameter
 			dunn_indices.append(dunn_index)

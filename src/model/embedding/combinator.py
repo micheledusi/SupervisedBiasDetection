@@ -16,7 +16,7 @@ from datasets import Dataset
 import torch
 from tqdm import tqdm
 
-from utils.config import Configurable, ConfigurationsGrid, Parameter
+from utils.config import Configurable, Configurations, Parameter
 
 
 class EmbeddingsCombinator(Configurable):
@@ -26,7 +26,7 @@ class EmbeddingsCombinator(Configurable):
     The combinator takes these embeddings and samples the appropriate number of words and templates, then combines them into one or multiple testcases.
     """
 
-    def __init__(self, configs: ConfigurationsGrid):
+    def __init__(self, configs: Configurations):
         """
         Initializes the combinator.
         :param raw_embedder: the raw embedder, which will provide the raw embeddings
@@ -59,7 +59,7 @@ class EmbeddingsCombinator(Configurable):
         # Initializes the result
         combined_embeddings: dict = {}
 
-        for config in self.configs:
+        for config in self.configs.iterate_over(Configurations.ParametersSelection.EMBEDDINGS_COMBINATION):
             logging.debug("Current configuration for the combined embeddings computation:\n%s", config)
 
             # Gets the list of unique words
