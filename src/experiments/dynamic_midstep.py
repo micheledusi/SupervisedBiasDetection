@@ -21,7 +21,7 @@ from model.classification.chi import ChiSquaredTest, FisherCombinedProbabilityTe
 from model.classification.factory import ClassifierFactory
 from model.embedding.cluster_validator import ClusteringScorer
 from model.reduction.weights import WeightsSelectorReducer
-from utils.config import Configurations, Parameter
+from utils.config import Configurations
 
 EMB_COL: str = "embedding"
 
@@ -32,13 +32,12 @@ class ReductionStrategy(Enum):
 	RELEVANT_SAMPLING = "relevant_sampling"
 	ANTI_RELEVANT_SAMPLING = "anti_relevant_sampling"
 	TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice"
-	# ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"
+	ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"
 
 
 class DynamicPipelineExperiment(Experiment):
 	"""
-	In this experiment, we train a classifier on the embeddings of the protected property.
-	Then, we simply measure its accuracy and F1 score on the test-set.
+	In this experiment, we try several strategies to choose the best value of the midstep a priori.
 	"""
 
 	DatasetPair = tuple[Dataset, Dataset]
@@ -111,6 +110,11 @@ class DynamicPipelineExperiment(Experiment):
 		# We select the N features with the highest relevance
 		top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(relevance, best_n)
 		reduced_embs[ReductionStrategy.TOP_N_WITH_BEST_CHOICE] = top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
+
+		# We select the N features with the lowest relevance
+		anti_relevance = 1 / relevance
+		anti_top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(anti_relevance, best_n)
+		reduced_embs[ReductionStrategy.ANTI_TOP_N_WITH_BEST_CHOICE] = anti_top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), anti_top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
 
 		return reduced_embs
 
