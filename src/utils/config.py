@@ -572,16 +572,27 @@ class Configurable:
 	"""
 	This class represents an object that can be configured using a set of configurations.
 	A `Configured` is initialized with a set of configurations and a list of `Parameter` objects.
-	The parameters are used to filter the configurations values: only the values of the configurations that correspond
-	to the parameters are used to configure the object. The other values are discarded.
+
+	If `filtered` flag is True, the parameters are used to filter the configurations values: 
+	only the values of the configurations that correspond to the parameters are used to configure the object. 
+	The other values are discarded.
+
+	If `filtered` flag is False, the parameters list is used to verify that the configurations contain all the parameters.
+	However, no filtering is done: all the values of the configurations are kept.
 	"""
 
-	def __init__(self, configs: Configurations, parameters: list[Parameter]) -> None:
+	def __init__(self, configs: Configurations, parameters: list[Parameter], filtered: bool=True) -> None:
 		if not configs:
 			raise ValueError("The set of configurations cannot be empty.")
 		if not parameters or len(parameters) == 0:
 			raise ValueError("The list of parameters cannot be empty. At least one parameter must be provided.")
-		self.__configs: Configurations = configs.subget(*parameters)
+		if filtered:
+			self.__configs: Configurations = configs.subget(*parameters)
+		else:
+			for param in parameters:
+				if param not in configs:
+					raise ValueError(f"The parameter '{param}' is not contained in the set of configurations.")
+			self.__configs: Configurations = configs
 
 
 	@property

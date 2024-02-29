@@ -37,7 +37,7 @@ class EmbeddingsCombinator(Configurable):
             Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE,
             Parameter.TEMPLATES_POLICY,
             Parameter.MAX_TESTCASE_NUMBER,
-			])
+			], filtered=False)
         
     def combine(self, raw_embeddings: Dataset) -> dict:
         """
