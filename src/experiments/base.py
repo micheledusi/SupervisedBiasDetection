@@ -9,9 +9,11 @@
 
 
 from abc import abstractmethod
+import logging
 import os
 import time
-from datasets import Dataset
+from typing import Any
+from datasets import Dataset, concatenate_datasets
 
 from utils.caching.creation import PropertyDataReference, get_cached_embeddings, get_cached_raw_embeddings
 from utils.config import Configurations
@@ -58,6 +60,9 @@ class Experiment:
 
 		# Flags
 		self._is_executing: bool = False
+
+		# Collector
+		self.__results_collector: ResultCollector = ResultCollector(self)
 	
 	@property
 	def name(self) -> str:
@@ -77,6 +82,15 @@ class Experiment:
 		"""
 		return self.__configs
 	
+	@property
+	def results_collector(self) -> "ResultCollector":
+		"""
+		The result collector for the experiment.
+
+		:return: The result collector for the experiment.
+		"""
+		return self.__results_collector
+
 	@property
 	def protected_property(self) -> PropertyDataReference:
 		"""
@@ -255,7 +269,12 @@ class Experiment:
 		self.stereotyped_property = None
 		self.midstep = None
 		self._is_executing = False
-		print(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
+		logging.info(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
+		# Saving the results
+		results_ds: Dataset = self.results_collector.get_results()
+		if results_ds is not None and len(results_ds) > 0:
+			results_folder: str = self._get_results_folder(self.configs)
+			results_ds.to_csv(f"{results_folder}/{self.name}_{time.strftime('%Y%m%d-%H%M%S')}.csv", index=False)
 	
 	@staticmethod
 	def _get_property_embeddings(property: PropertyDataReference, configs: Configurations) -> Dataset:
@@ -324,3 +343,74 @@ class Experiment:
 		Description and execution of the core experiment.
 		"""
 		raise NotImplementedError
+	
+
+class ResultCollector:
+	"""
+	A class to collect the results of the experiments.
+	"""
+
+	EXPERIMENT_NAME_COL: str = "experiment_name"
+
+	def __init__(self, experiment: Experiment) -> None:
+		"""
+		The initializer for the result collector.
+
+		:param experiment: The experiment to collect the results from.
+		"""
+		self.__experiment = experiment
+		self.__results: Dataset = None
+
+	
+	def collect(self, current_configs: Configurations, results: dict[str, Any]) -> None:
+		"""
+		Collects the results of the experiment.
+
+		:param current_configs: The current configurations of the experiment with which the results were obtained.
+		:param results: The results of the experiment.
+		"""
+		# We analyse the structure of the results to understand how to collect them
+		are_results_list: bool = True
+		results_len: int = 1
+		for key in results.keys():
+			if not isinstance(results[key], list):
+				are_results_list = False
+				break
+			else:
+				results_len: int = len(results[key])
+		# We verify that all the results have the same length
+		if are_results_list:
+			for key in results.keys():
+				if len(results[key]) != results_len:
+					raise ValueError("The results have different lengths. Please check consistency.")
+
+		# We create a dictionary to collect the results
+		current_results_dict: dict[str, list] = {}
+		# We add a column for the experiment name
+		current_results_dict[self.EXPERIMENT_NAME_COL] = [self.__experiment.name] * results_len
+		# Now we add the configurations to the dictionary, such that each config_key is associated to a list
+		for key in current_configs.keys:
+			current_results_dict[key.value] = [current_configs[key]] * results_len
+		# Ad then we add the results to the dictionary
+		for key in results.keys():
+			if are_results_list:
+				current_results_dict[key] = results[key]
+			else:
+				current_results_dict[key] = [results[key]]
+
+		# Finally, we convert the results into a dataset
+		results_ds: Dataset = Dataset.from_dict(current_results_dict)
+		# We add the results to the internal results dataset
+		if self.__results:
+			self.__results = concatenate_datasets([self.__results, results_ds])
+		else:
+			self.__results = results_ds
+	
+
+	def get_results(self) -> Dataset:
+		"""
+		Returns the collected results.
+
+		:return: The collected results.
+		"""
+		return self.__results

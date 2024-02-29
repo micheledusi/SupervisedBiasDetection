@@ -70,9 +70,10 @@ class DynamicPipelineExperiment(Experiment):
 		
 		# Phase 2: crossing the protected embeddings with the stereotyped embeddings to measure the bias
 		for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
-			print("******************************************************")
-			print(f"{Color.GREEN}Strategy: {strategy}{Color.OFF}")
-			self._execute_crossing(reduced_embs_ds_list)
+			# print(f"{Color.GREEN}Strategy: {strategy}{Color.OFF}")
+			strategy_results: dict = self._execute_crossing(reduced_embs_ds_list)
+			strategy_results['strategy'] = strategy.value
+			self.results_collector.collect(self.configs, strategy_results)
 
 
 	def _execute_reduction(self, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> dict[ReductionStrategy, DatasetPair]:
@@ -202,13 +203,14 @@ class DynamicPipelineExperiment(Experiment):
 		return reduced_prot_embs_ds, reduced_ster_embs_ds
 
 
-	def _execute_crossing(self, embs_ds_list: list[tuple[Dataset, Dataset]]) -> None:
+	def _execute_crossing(self, embs_ds_list: list[tuple[Dataset, Dataset]]) -> dict[str, float]:
 		"""
 		Compares the protected embeddings with the stereotyped embeddings to measure the bias.
 		The comparison is done using the chi-squared test for each testcase.
 		Then, the results are combined using the Fisher's method and the Harmonic mean.
 
 		:param embs_ds_list: The list of datasets of the embeddings: each element is a tuple containing the protected and the stereotyped embeddings datasets.
+		:return: A dictionary containing the results of the comparison.
 		"""
 		chi2 = ChiSquaredTest()
 		chi2_values_list: list = []
@@ -241,9 +243,18 @@ class DynamicPipelineExperiment(Experiment):
 
 		# Printing the results
 		logging.info("Configurations for the experiment:\n%s", self.configs)
-		print(f"{Effect.BOLD}AGGREGATED RESULTS{Effect.OFF}:     AVG ± STD		over {len(embs_ds_list)} testcases")
-		print(f"Chi-Squared value:   {chi2_averages[0]:6.3f} ± {chi2_std_devs[0]:5.3f}")
-		print(f"{Effect.BOLD}COMBINED RESULTS{Effect.OFF}:")
-		print(f"Fisher Test value:   {x2:.3f} with {degs} degrees of freedom")
-		print(f"p-value:             {p_value}")
-		print(f"Harmonic mean p-value: {harmonic_mean_p_value}")
+		# print(f"{Effect.BOLD}AGGREGATED RESULTS{Effect.OFF}:     AVG ± STD		over {len(embs_ds_list)} testcases")
+		# print(f"Chi-Squared value:   {chi2_averages[0]:6.3f} ± {chi2_std_devs[0]:5.3f}")
+		# print(f"{Effect.BOLD}COMBINED RESULTS{Effect.OFF}:")
+		# print(f"Fisher Test value:   {x2:.3f} with {degs} degrees of freedom")
+		# print(f"p-value:             {p_value}")
+		# print(f"Harmonic mean p-value: {harmonic_mean_p_value}")
+
+		return dict({
+			"chi2_avg": chi2_averages[0],
+			"chi2_std_dev": chi2_std_devs[0],
+			"fisher_x2": x2,
+			"fisher_degrees": degs,
+			"fisher_p_value": p_value,
+			"harmonic_mean_p_value": harmonic_mean_p_value
+		})
