@@ -10,7 +10,6 @@
 
 from enum import Enum
 import logging
-from colorist import Color, Effect
 from datasets import Dataset
 import torch
 from tqdm import tqdm
@@ -19,12 +18,16 @@ from experiments.base import Experiment
 from model.classification.base import AbstractClassifier
 from model.classification.chi import ChiSquaredTest, FisherCombinedProbabilityTest, HarmonicMeanPValue
 from model.classification.factory import ClassifierFactory
+from model.embedding.center import EmbeddingCenterer
 from model.embedding.cluster_validator import ClusteringScorer
+from model.embedding.combinator import EmbeddingsCombinator
 from model.reduction.weights import WeightsSelectorReducer
+from utils.caching.creation import get_cached_raw_embeddings
 from utils.config import Configurations
 
 EMB_COL: str = "embedding"
 
+REBUILD_DATASETS = False
 
 class ReductionStrategy(Enum):
 	NONE = "none"
@@ -45,20 +48,58 @@ class DynamicPipelineExperiment(Experiment):
 	def __init__(self, configs: Configurations) -> None:
 		super().__init__(
 			"dynamic_pipeline", 
-			required_kwargs=[
-				self.PROTECTED_EMBEDDINGS_DATASETS_LIST_KEY, 
-				self.STEREOTYPED_EMBEDDINGS_DATASETS_LIST_KEY,
-			], 
+			required_kwargs=['prot_prop', 'ster_prop'], 
 			configs=configs
 			)
-	
+
+
 	def _execute(self, **kwargs) -> None:	
-		# Getting the embeddings
-		prot_embs_ds_list: list[Dataset] = self._extract_value_from_kwargs(self.PROTECTED_EMBEDDINGS_DATASETS_LIST_KEY, **kwargs)
-		ster_embs_ds_list: list[Dataset] = self._extract_value_from_kwargs(self.STEREOTYPED_EMBEDDINGS_DATASETS_LIST_KEY, **kwargs)
+		# For every combination of parameters (for the step of the raw embeddings computation)
+		for configs_re in self.configs.iterate_over(Configurations.ParametersSelection.RAW_EMBEDDINGS_COMPUTATION):
+			
+			# Loading the datasets
+			protected_property_ds: Dataset = get_cached_raw_embeddings(self.protected_property, configs_re, REBUILD_DATASETS)
+			stereotyped_property_ds: Dataset = get_cached_raw_embeddings(self.stereotyped_property, configs_re, REBUILD_DATASETS)
 
-		assert len(prot_embs_ds_list) == len(ster_embs_ds_list), "The number of protected and stereotyped embeddings datasets must be the same, i.e. the same number of testcases."
+			logging.debug(f"Resulting protected raw dataset for property \"{self.protected_property.name}\":\n{protected_property_ds}")
+			logging.debug(f"Resulting stereotyped raw dataset for property \"{self.stereotyped_property.name}\":\n{stereotyped_property_ds}")
+		
+			# Combining the embeddings
+			combinator = EmbeddingsCombinator(configs_re)
 
+			combined_protected_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(protected_property_ds)
+			combined_stereotyped_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(stereotyped_property_ds)
+
+			# Centering the embeddings
+			# For each configuration of the combined embeddings:
+			for key_configs in combined_protected_embeddings:
+				centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
+				# Centering the embeddings for each testcase
+				combined_protected_embeddings[key_configs] = [centerer.center(ds) for ds in combined_protected_embeddings[key_configs]]
+			for key_configs in combined_stereotyped_embeddings:
+				centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
+				# Centering the embeddings for each testcase
+				combined_stereotyped_embeddings[key_configs] = [centerer.center(ds) for ds in combined_stereotyped_embeddings[key_configs]]	
+
+			# Now we have the combined embeddings, we can proceed with the bias detection
+			for key_configs in combined_protected_embeddings:
+				print(f"Running experiment for configuration:\n{key_configs}")
+
+				# We assume that the keys of the two dictionaries are the same
+				# Meaning that the configurations are the same for both the protected and the stereotyped property
+				protected_embs_ds_list: list[Dataset] = combined_protected_embeddings[key_configs]
+				stereotyped_embs_ds_list: list[Dataset] = combined_stereotyped_embeddings[key_configs]
+
+				self._execute_for_single_configuration(protected_embs_ds_list, stereotyped_embs_ds_list)
+
+
+	def _execute_for_single_configuration(self, prot_embs_ds_list: list[Dataset], ster_embs_ds_list: list[Dataset]) -> None:
+		"""
+		Executes the experiment for a single configuration of the embeddings.
+
+		:param prot_embs_ds_list: The list of datasets of the protected embeddings.
+		:param ster_embs_ds_list: The list of datasets of the stereotyped embeddings.
+		"""
 		# Phase 1: the reduction step
 		reduced_embs_ds_by_strategy: dict[ReductionStrategy, list[tuple[Dataset, Dataset]]] = {strategy: [] for strategy in ReductionStrategy}
 
@@ -74,6 +115,7 @@ class DynamicPipelineExperiment(Experiment):
 			strategy_results: dict = self._execute_crossing(reduced_embs_ds_list)
 			strategy_results['strategy'] = strategy.value
 			self.results_collector.collect(self.configs, strategy_results)
+
 
 
 	def _execute_reduction(self, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> dict[ReductionStrategy, DatasetPair]:

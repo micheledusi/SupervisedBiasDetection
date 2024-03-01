@@ -263,18 +263,18 @@ class Experiment:
 		self.midstep = self._extract_midstep(**kwargs)
 		# Executing the experiment
 		self._execute(**kwargs)
-		# Cleaning up
 		end_time = time.time()
-		self.protected_property = None
-		self.stereotyped_property = None
-		self.midstep = None
-		self._is_executing = False
-		logging.info(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
 		# Saving the results
 		results_ds: Dataset = self.results_collector.get_results()
 		if results_ds is not None and len(results_ds) > 0:
 			results_folder: str = self._get_results_folder(self.configs)
 			results_ds.to_csv(f"{results_folder}/{self.name}_{time.strftime('%Y%m%d-%H%M%S')}.csv", index=False)
+		# Cleaning up
+		self.protected_property = None
+		self.stereotyped_property = None
+		self.midstep = None
+		self._is_executing = False
+		logging.info(f"Experiment {self.name} completed in {end_time - start_time} seconds.")
 	
 	@staticmethod
 	def _get_property_embeddings(property: PropertyDataReference, configs: Configurations) -> Dataset:
@@ -292,7 +292,7 @@ class Experiment:
 		# 	templates_file_id: The id of the templates file to use. (e.g. 01, 02, etc.)
 
 		# Retrieving embeddings dataset from cache
-		embeddings: Dataset = get_cached_embeddings(property, configs=configs, bool=REBUILD)
+		embeddings: Dataset = get_cached_embeddings(property, configs=configs, rebuild=REBUILD)
 		squeezed_embs = embeddings['embedding'].squeeze().tolist()
 		embeddings = embeddings.remove_columns('embedding').add_column('embedding', squeezed_embs).with_format('torch')
 		return embeddings
