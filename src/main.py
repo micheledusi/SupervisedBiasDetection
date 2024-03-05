@@ -38,13 +38,13 @@ STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
 
 configs = Configurations({
 	# Raw embeddings computation
-	Parameter.MODEL_NAME: [MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED],
+	Parameter.MODEL_NAME: MODEL_NAME_BERT_BASE_UNCASED,
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.LONGER_WORD_POLICY: 'truncate',
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [1.0],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [1.0],
-	Parameter.TEMPLATES_POLICY: ['average'],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5, 0.8, 1.0],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.5, 1.0],
+	Parameter.TEMPLATES_POLICY: ['average', 'distinct'],
 	Parameter.MAX_TESTCASE_NUMBER: 10,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
