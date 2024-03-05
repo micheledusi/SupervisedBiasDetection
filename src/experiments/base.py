@@ -226,14 +226,22 @@ class Experiment:
 
 		if self.protected_property is not None:
 			if prot_values is None:
-				prot_values = self._get_property_embeddings(self.protected_property, configs)['word']
-			prot_str: str = self.protected_property.name_with_classes_number(prot_values)
+				try:
+					prot_values = self._get_property_embeddings(self.protected_property, configs)['word']
+					prot_str: str = self.protected_property.name_with_classes_number(prot_values)
+				except:
+					TypeError
+					prot_str: str = self.protected_property.name
 			properties_strings.append(prot_str)
 
 		if self.stereotyped_property is not None:
 			if ster_values is None:
-				ster_values = self._get_property_embeddings(self.stereotyped_property, configs)['word']
-			ster_str: str = self.stereotyped_property.name_with_classes_number(ster_values)
+				try:
+					ster_values = self._get_property_embeddings(self.stereotyped_property, configs)['word']
+					ster_str: str = self.stereotyped_property.name_with_classes_number(ster_values)
+				except:
+					TypeError
+					ster_str: str = self.stereotyped_property.name
 			properties_strings.append(ster_str)
 
 		folder: str = f"{fs.get_model_results_folder(configs)}/{'-'.join(properties_strings)}"
