@@ -14,7 +14,7 @@ import logging
 from experiments.dynamic_midstep import DynamicPipelineExperiment
 
 # Logging setup
-logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # Torch setup
 torch.manual_seed(42)
 torch.use_deterministic_algorithms(True)    # For reproducibility
@@ -30,10 +30,10 @@ from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, M
 
 # PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)
-PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
-# PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
-# STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
+# PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
+PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
 
 
 configs = Configurations({
@@ -42,8 +42,8 @@ configs = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.LONGER_WORD_POLICY: 'truncate',
 	# Combining embeddings in single testcases
-	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.5, 0.8, 1.0],
-	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.5, 1.0],
+	Parameter.WORDS_SAMPLING_PERCENTAGE: [0.2, 0.3],
+	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: [0.2, 0.3],
 	Parameter.TEMPLATES_POLICY: ['average', 'distinct'],
 	Parameter.MAX_TESTCASE_NUMBER: 10,
 	# Testcase post-processing
