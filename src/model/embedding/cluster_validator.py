@@ -8,6 +8,7 @@
 # This module contains the class "DisconnectionScorer", which is responsible for computing the 'disconnection' metrics between classes in a dataset of embeddings.
 
 
+import logging
 from deprecated import deprecated
 import torch
 from datasets import Dataset
@@ -106,10 +107,11 @@ class ClusteringScorer(Configurable):
 			max_diameter = max(intra_class_distances[c])
 			# FIXME: UNUSED :: avg_diameter = sum(intra_class_distances[c]) / len(intra_class_distances[c])
 			if max_diameter == 0:
-				raise ValueError("The method is not computable: found a class with size = 1, which makes the computation of the diameter impossible.")
-			# We compute the Dunn index for the cluster
-			dunn_index = min_separation / max_diameter
-			dunn_indices.append(dunn_index)
+				logging.error("The method is not computable: found a class with size = 1, which makes the computation of the diameter impossible.")
+			else:
+				# We compute the Dunn index for the cluster
+				dunn_index = min_separation / max_diameter
+				dunn_indices.append(dunn_index)
 		# We compute the Dunn index for the entire dataset
 		dunn_index = sum(dunn_indices) / len(dunn_indices)
 		return dunn_index

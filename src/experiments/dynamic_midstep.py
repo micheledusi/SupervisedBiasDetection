@@ -10,6 +10,7 @@
 
 from enum import Enum
 import logging
+from colorist import Color
 from datasets import Dataset
 import torch
 from tqdm import tqdm
@@ -21,9 +22,12 @@ from model.classification.factory import ClassifierFactory
 from model.embedding.center import EmbeddingCenterer
 from model.embedding.cluster_validator import ClusteringScorer
 from model.embedding.combinator import EmbeddingsCombinator
+from model.reduction.base import BaseDimensionalityReducer
+from model.reduction.pca import TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
 from utils.caching.creation import get_cached_raw_embeddings
 from utils.config import Configurations
+from view.plotter.scatter import DatasetPairScatterPlotter
 
 EMB_COL: str = "embedding"
 
@@ -34,8 +38,10 @@ class ReductionStrategy(Enum):
 	RANDOM_SAMPLING = "random_sampling"
 	RELEVANT_SAMPLING = "relevant_sampling"
 	ANTI_RELEVANT_SAMPLING = "anti_relevant_sampling"
-	TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice"
-	ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"
+	# ENHANCED_RELEVANT_SAMPLING = "enhanced_relevant_sampling"
+	# ENHANCED_ANTI_RELEVANT_SAMPLING = "enhanced_anti_relevant_sampling"
+	# TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice" 			@deprecated
+	# ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"	@deprecated
 
 
 class DynamicPipelineExperiment(Experiment):
@@ -90,10 +96,10 @@ class DynamicPipelineExperiment(Experiment):
 				protected_embs_ds_list: list[Dataset] = combined_protected_embeddings[key_configs]
 				stereotyped_embs_ds_list: list[Dataset] = combined_stereotyped_embeddings[key_configs]
 
-				self._execute_for_single_configuration(protected_embs_ds_list, stereotyped_embs_ds_list)
+				self._execute_for_single_configuration(key_configs, protected_embs_ds_list, stereotyped_embs_ds_list)
 
 
-	def _execute_for_single_configuration(self, prot_embs_ds_list: list[Dataset], ster_embs_ds_list: list[Dataset]) -> None:
+	def _execute_for_single_configuration(self, current_configs: Configurations, prot_embs_ds_list: list[Dataset], ster_embs_ds_list: list[Dataset]) -> None:
 		"""
 		Executes the experiment for a single configuration of the embeddings.
 
@@ -103,19 +109,46 @@ class DynamicPipelineExperiment(Experiment):
 		# Phase 1: the reduction step
 		reduced_embs_ds_by_strategy: dict[ReductionStrategy, list[tuple[Dataset, Dataset]]] = {strategy: [] for strategy in ReductionStrategy}
 
+		# This cycle is executed for each testcase
 		for prot_embs_ds, ster_embs_ds in tqdm(zip(prot_embs_ds_list, ster_embs_ds_list), desc="Reduction step", total=len(prot_embs_ds_list)):
-			reduction_results = self._execute_reduction(prot_embs_ds, ster_embs_ds)
-			# We append the results to the list of datasets for each strategy
+			# Each testcase is reduced with different strategies
+			reduction_results: dict = self._execute_reduction(prot_embs_ds, ster_embs_ds)
+			# The result of each strategy is collected, along with the results of the other testcases for the same strategy
 			for strategy, reduced_embs_ds in reduction_results.items():
 				reduced_embs_ds_by_strategy[strategy].append(reduced_embs_ds)
+
+		# Phase 1.5: plotting the reduced embeddings with the ScatterPlotter
+		# For each strategy
+		for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
+			logging.info(f"Plotting embeddings for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+			# For each testcase in this strategy
+			for prot_embs_ds, ster_embs_ds in reduced_embs_ds_list:
+				self._execute_plotting(strategy, prot_embs_ds, ster_embs_ds)
+
+		# FIXME DEBUG
+		exit()
 		
 		# Phase 2: crossing the protected embeddings with the stereotyped embeddings to measure the bias
 		for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
 			# print(f"{Color.GREEN}Strategy: {strategy}{Color.OFF}")
 			strategy_results: dict = self._execute_crossing(reduced_embs_ds_list)
 			strategy_results['strategy'] = strategy.value
-			self.results_collector.collect(self.configs, strategy_results)
+			self.results_collector.collect(current_configs, strategy_results)
 
+
+	def _execute_plotting(self, strategy: ReductionStrategy, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> None:
+		"""
+		Executes the plotting step of the experiment.
+		"""
+		# Reduction based on PCA (trained on the protected embeddings)
+		bidim_reducer: BaseDimensionalityReducer = TrainedPCAReducer(prot_embs_ds[EMB_COL], output_features=2)
+		reduced_prot_embs_ds: Dataset = bidim_reducer.reduce_ds(prot_embs_ds)
+		reduced_ster_embs_ds: Dataset = bidim_reducer.reduce_ds(ster_embs_ds)
+		
+		# Plotting the reduced embeddings
+		plotter: DatasetPairScatterPlotter = DatasetPairScatterPlotter(reduced_prot_embs_ds, reduced_ster_embs_ds,
+			title=f"Reduced embeddings for strategy: {strategy.name}")
+		plotter.show()
 
 
 	def _execute_reduction(self, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> dict[ReductionStrategy, DatasetPair]:
@@ -140,14 +173,31 @@ class DynamicPipelineExperiment(Experiment):
 
 		# Getting the relevance of the features
 		relevance: torch.Tensor = self._compute_relevance(prot_embs_ds)
-		relevance_probabilities = relevance / relevance.max()
+		relevance_probabilities = DynamicPipelineExperiment._normalize_relevance(relevance)
 
 		# For each feature, we sample it with a probability equal to its relevance
 		reduced_embs[ReductionStrategy.RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, relevance_probabilities)
 
 		# For each feature, we sample it with a probability equal to 1 - its relevance
-		reduced_embs[ReductionStrategy.ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, 1 - relevance_probabilities)
+		anti_relevance_probabilities = 1 - relevance_probabilities
+		reduced_embs[ReductionStrategy.ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, anti_relevance_probabilities)
 
+		"""
+		# unused
+
+		# For each feature, we sample it with a probability equal to its relevance
+		reduced_embs[ReductionStrategy.ENHANCED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, 
+			DynamicPipelineExperiment._enhance_probabilities(relevance_probabilities))
+
+		# For each feature, we sample it with a probability equal to 1 - its relevance
+		anti_relevance_probabilities = 1 - relevance_probabilities
+		reduced_embs[ReductionStrategy.ENHANCED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds,
+			DynamicPipelineExperiment._enhance_probabilities(anti_relevance_probabilities))
+		"""
+
+		"""
+		@deprecated
+		
 		# We choose the best value for N
 		best_n: int = self._choose_best_n(prot_embs_ds, relevance)
 		# We select the N features with the highest relevance
@@ -158,8 +208,33 @@ class DynamicPipelineExperiment(Experiment):
 		anti_relevance = 1 / relevance
 		anti_top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(anti_relevance, best_n)
 		reduced_embs[ReductionStrategy.ANTI_TOP_N_WITH_BEST_CHOICE] = anti_top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), anti_top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
-
+		"""
+		
 		return reduced_embs
+
+
+	@staticmethod
+	def _normalize_relevance(relevance: torch.Tensor) -> torch.Tensor:
+		"""
+		Maps the relevance values to the range [0, 1].
+		It assures that the minimum value is 0 and the maximum value is 1.
+
+		:param relevance: The relevance values to normalize.
+		:return: The normalized relevance values.
+		"""
+		rel_min = relevance.min()
+		return (relevance - rel_min) / (relevance.max() - rel_min)
+
+
+	@staticmethod
+	def _enhance_probabilities(probabilities: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+		"""
+		Enhances the probabilities by subtracting the mean and applying the sigmoid function.
+
+		:param probabilities: The probabilities to enhance.
+		:return: The enhanced probabilities.
+		"""
+		return torch.sigmoid(probabilities - threshold)
 
 
 	def _choose_best_n(self, prot_embs_ds: Dataset, relevance: torch.Tensor) -> int:
