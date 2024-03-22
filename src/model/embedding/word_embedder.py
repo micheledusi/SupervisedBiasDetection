@@ -465,7 +465,9 @@ class RawEmbedder(Configurable):
 			The result is the same batch, with the addition of the "embedding" key, which contains the embeddings of the words.
 			"""
 			# Tokenizing the sentences
-			tokenized_sentences: torch.Tensor = self.tokenizer(sentences_batch['sentence'], padding=True, truncation=False, return_tensors='pt')['input_ids'].to(DEVICE)
+			tokenizer_output = self.tokenizer(sentences_batch['sentence'], padding=True, truncation=False, return_tensors='pt')
+			tokenized_sentences: torch.Tensor = tokenizer_output['input_ids'].to(DEVICE)
+			attention_mask: torch.Tensor = tokenizer_output['attention_mask'].to(DEVICE)
 			batch_len: int = tokenized_sentences.shape[0]
 			# We obtain a tensor of size [#sentences, #tokens] containing the IDs of the tokens of each sentence
 
@@ -476,7 +478,7 @@ class RawEmbedder(Configurable):
 			assert len(words_indices) == batch_len, "The number of words_indices must be equal to the batch size."
 			
 			# Computing the embeddings
-			embeddings_tensor: torch.Tensor = self.model(tokenized_sentences)['last_hidden_state'].to(DEVICE)
+			embeddings_tensor: torch.Tensor = self.model(tokenized_sentences, attention_mask=attention_mask)['last_hidden_state'].to(DEVICE)
 			assert embeddings_tensor.shape[0] == batch_len, "The number of embedded sentences must be equal to the batch size."
 			
 			# Extracting the embeddings of the word from the tensor
