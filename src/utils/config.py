@@ -166,7 +166,10 @@ class Configurations:
 			self.__dict = {}
 		# Otherwise, in case the values are provided
 		else:
-			self.__dict = values.copy()
+			# We clone the values passed as parameters
+   			# If the value is a list, we change it to a tuple for hashability
+	  		# Otherwise, we keep the value as it is
+			self.__dict = {key: tuple(value) if isinstance(value, list) else value for key, value in values.items()}
 
 		# If we cannot access the default values, we need to check that all the mutables are contained in the set of configurations
 		if not self.__use_base_values:
@@ -451,7 +454,9 @@ class Configurations:
 		def __init__(self, original_configs: "Configurations", changing_parameters: tuple[Parameter]) -> None:
 			self.__ref_configs: "Configurations" = original_configs
 			""" The reference configurations. """
-			self.__changing_parameters: tuple[Parameter] = tuple(key for key in changing_parameters if isinstance(self.original[key], list))
+			self.__changing_parameters: tuple[Parameter] = tuple(key for key in changing_parameters 
+														if isinstance(self.original[key], list)
+														or isinstance(self.original[key], tuple))
 			""" The changing parameters, only if they have multiple values (i.e. the associated value is a list). """
 			self.__indices: dict[Parameter, int] = {key: 0 for key in self.__changing_parameters}
 			""" The indices of the current combination of values, only for the changing parameters. """

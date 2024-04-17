@@ -33,14 +33,14 @@ from view.plotter.weights import WeightsPlotter
 
 # Logging setup
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 
 REBUILD_DATASETS = False
 
-DO_PLOT = True
-DO_SHOW_PLOT = DO_PLOT and True
-DO_SAVE_PLOT = DO_PLOT and True
+DO_PLOT = False
+DO_SHOW_PLOT = DO_PLOT and False
+DO_SAVE_PLOT = DO_PLOT and False
 DO_PLOT_FOR_LATEX = DO_PLOT and True
 
 DO_CHI2 = True
@@ -51,13 +51,13 @@ class ReductionStrategy(Enum):
 	RANDOM_SAMPLING = "random_sampling"
 	RELEVANT_SAMPLING = "relevant_sampling"
 	ANTI_RELEVANT_SAMPLING = "anti_relevant_sampling"
-	# SQUARED_RELEVANT_SAMPLING = "squared_relevant_sampling"
-	# SQUARED_ANTI_RELEVANT_SAMPLING = "squared_anti_relevant_sampling"
-	# ENHANCED_RELEVANT_SAMPLING = "enhanced_relevant_sampling"					@deprecated
-	# ENHANCED_ANTI_RELEVANT_SAMPLING = "enhanced_anti_relevant_sampling"		@deprecated
-	# TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice" 						@deprecated
-	# ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"				@deprecated
-	PCA2 = "pca_2"
+	SQUARED_RELEVANT_SAMPLING = "squared_relevant_sampling"
+	SQUARED_ANTI_RELEVANT_SAMPLING = "squared_anti_relevant_sampling"
+	ENHANCED_RELEVANT_SAMPLING = "enhanced_relevant_sampling"					#@deprecated
+	ENHANCED_ANTI_RELEVANT_SAMPLING = "enhanced_anti_relevant_sampling"			#@deprecated
+	# TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice" 						#@deprecated
+	# ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"				#@deprecated
+	# PCA2 = "pca_2"
 	TRAINED_PCA2 = "trained_pca_2"
 	RELEVANT_SAMPLING_PLUS_TRAINED_PCA2 = "relevant_sampling_plus_trained_pca2"
 	# SQUARED_RELEVANT_SAMPLING_PLUS_TRAINED_PCA2 = "squared_relevant_sampling_plus_trained_pca2"
@@ -150,22 +150,27 @@ class DynamicPipelineExperiment(Experiment):
 					break	# We plot only the first testcase
 		
 		# Phase 2: crossing the protected embeddings with the stereotyped embeddings to measure the bias
-		if DO_CHI2:	
-			# For each strategy
-			for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
-				print(f"Computing Chi-Squared value for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
-				strategy_results: dict = self._execute_crossing(strategy, reduced_embs_ds_list)
-				strategy_results['strategy'] = strategy.value
-				self.results_collector.collect(current_configs, strategy_results)
+		if DO_CHI2:
+			# If we have multiple strategies for the bias evaluation, we need to execute the experiment for each of them
+			for bias_eval_config in current_configs.iterate_over(Configurations.ParametersSelection.BIAS_EVALUTATION):
 
-				print(f"Results for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
-				for key, value in strategy_results.items():
-					print(f"{Color.CYAN}{key:<22s}{Color.OFF}: {value}")
+				# For each strategy
+				for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
+					print(f"Computing Chi-Squared value for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+					# print(f"Configurations: {bias_eval_config}")
+
+					strategy_results: dict = self._execute_crossing(bias_eval_config, strategy, reduced_embs_ds_list)
+					strategy_results['strategy'] = strategy.value
+					self.results_collector.collect(bias_eval_config, strategy_results)
+
+					print(f"Results for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+					for key, value in strategy_results.items():
+						print(f"{Color.CYAN}{key:<22s}{Color.OFF}: {value}")
 			
-			# Saving the results of the testcases
-			if self.testcase_results_ds:
-				self.testcase_results_ds.to_csv(self._get_results_folder(current_configs) + f"/testcases_results_{current_configs.to_abbrstr()}.csv")
-				self.testcase_results_ds = None
+				# Saving the results of the testcases
+				if self.testcase_results_ds:
+					self.testcase_results_ds.to_csv(self._get_results_folder(bias_eval_config) + f"/testcases_results_{bias_eval_config.to_abbrstr()}.csv")
+					self.testcase_results_ds = None
 
 
 	def _execute_plotting(self, strategy: ReductionStrategy, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> None:
@@ -213,16 +218,16 @@ class DynamicPipelineExperiment(Experiment):
 		relevance: torch.Tensor = self._compute_relevance(prot_embs_ds)
 		relevance_probabilities = DynamicPipelineExperiment._normalize_relevance(relevance)		# Ensuring that the relevance is in the range [0, 1]
 		anti_relevance_probabilities = 1 - relevance_probabilities								# The anti-relevance is the complement of the relevance
-		# squared_relevance_probabilities = relevance_probabilities ** 2							# The squared probabilities, to enhance the relevance
-		# squared_anti_relevance_probabilities = anti_relevance_probabilities ** 2				# The squared probabilities, to enhance the anti-relevance
+		squared_relevance_probabilities = relevance_probabilities ** 2							# The squared probabilities, to enhance the relevance
+		squared_anti_relevance_probabilities = anti_relevance_probabilities ** 2				# The squared probabilities, to enhance the anti-relevance
 
 		# Plotting the relevance
 		if not self.weights_already_plotted:
 			relevances_dict: dict[str, torch.Tensor] = {
 				"Relevance probabilities": relevance_probabilities,
 				"Anti-relevance probabilities": anti_relevance_probabilities,
-				# "Squared relevance probabilities": squared_relevance_probabilities,
-				# "Squared anti-relevance probabilities": squared_anti_relevance_probabilities,
+				"Squared relevance probabilities": squared_relevance_probabilities,
+				"Squared anti-relevance probabilities": squared_anti_relevance_probabilities,
 				}
 			WeightsPlotter(relevances_dict).show()
 			self.weights_already_plotted = True
@@ -233,14 +238,13 @@ class DynamicPipelineExperiment(Experiment):
 		# For each feature, we sample it with a probability equal to 1 - its relevance
 		reduced_embs[ReductionStrategy.ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, anti_relevance_probabilities)
 
-		# # For each feature, we sample it with a probability equal to its relevance squared
-		# reduced_embs[ReductionStrategy.SQUARED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_relevance_probabilities)
+		# For each feature, we sample it with a probability equal to its relevance squared
+		reduced_embs[ReductionStrategy.SQUARED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_relevance_probabilities)
 
-		# # For each feature, we sample it with a probability equal to its anti-relevance squared
-		# reduced_embs[ReductionStrategy.SQUARED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_anti_relevance_probabilities)
+		# For each feature, we sample it with a probability equal to its anti-relevance squared
+		reduced_embs[ReductionStrategy.SQUARED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_anti_relevance_probabilities)
 
-		"""
-		# unused
+		""" ENHANCED SAMPLING STRATEGIES """
 
 		# For each feature, we sample it with a probability equal to its relevance
 		reduced_embs[ReductionStrategy.ENHANCED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, 
@@ -250,7 +254,6 @@ class DynamicPipelineExperiment(Experiment):
 		anti_relevance_probabilities = 1 - relevance_probabilities
 		reduced_embs[ReductionStrategy.ENHANCED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds,
 			DynamicPipelineExperiment._enhance_probabilities(anti_relevance_probabilities))
-		"""
 
 		"""
 		@deprecated
@@ -270,11 +273,13 @@ class DynamicPipelineExperiment(Experiment):
 		# We apply PCA (2 dims) to the concatenation of the protected and the stereotyped embeddings
 		prot_ster_embs_ds: Dataset = concatenate_datasets([prot_embs_ds, ster_embs_ds]).with_format("torch")
 		original_dimension: int = prot_ster_embs_ds[COL_EMBS].shape[-1]
+		"""
 		pca2_reducer: BaseDimensionalityReducer = PCAReducer(input_features=original_dimension, output_features=2)
 		reduced_prot_ster_embs_ds: Dataset = pca2_reducer.reduce_ds(prot_ster_embs_ds)
 		reduced_prot_embs_ds: Dataset = reduced_prot_ster_embs_ds.select(range(len(prot_embs_ds)))
 		reduced_ster_embs_ds: Dataset = reduced_prot_ster_embs_ds.select(range(len(prot_embs_ds), len(prot_ster_embs_ds)))
 		reduced_embs[ReductionStrategy.PCA2] = reduced_prot_embs_ds, reduced_ster_embs_ds
+		"""
 
 		# We apply PCA (2 dims) first to the protected embeddings, and then to the stereotyped embeddings
 		trained_pca2_reducer: BaseDimensionalityReducer = TrainedPCAReducer(prot_embs_ds[COL_EMBS], output_features=2)
@@ -413,7 +418,7 @@ class DynamicPipelineExperiment(Experiment):
 		return reduced_prot_embs_ds, reduced_ster_embs_ds
 
 
-	def _execute_crossing(self, strategy: ReductionStrategy, embs_ds_list: list[tuple[Dataset, Dataset]]) -> dict[str, float]:
+	def _execute_crossing(self, config: Configurations, strategy: ReductionStrategy, embs_ds_list: list[tuple[Dataset, Dataset]]) -> dict[str, float]:
 		"""
 		Compares the protected embeddings with the stereotyped embeddings to measure the bias.
 		The comparison is done using the chi-squared test for each testcase.
@@ -430,7 +435,7 @@ class DynamicPipelineExperiment(Experiment):
 		for prot_dataset, ster_dataset in embs_ds_list:
 
 			# Creating and training the reduction classifier
-			classifier: AbstractClassifier = ClassifierFactory.create(self.configs, phase=ClassifierFactory.PHASE_CROSS)
+			classifier: AbstractClassifier = ClassifierFactory.create(config, phase=ClassifierFactory.PHASE_CROSS)
 			classifier.train(prot_dataset)
 
 			# We evaluate the predictions of the classifier on the stereotyped embeddings
@@ -446,6 +451,9 @@ class DynamicPipelineExperiment(Experiment):
 		chi2_values_list: torch.Tensor = torch.tensor(chi2_values_list)
 		chi2_averages = chi2_values_list.mean(dim=0)
 		chi2_std_devs = chi2_values_list.std(dim=0)
+
+		logger.debug(f"List of Chi-Squared values: {chi2_values_list}")
+		logger.debug(f"Averages of the previous list: {chi2_averages}")
 		
 		# Saving the testcases results along with the number of dimensions
 		num_features_list: list[int] = [prot_ds[COL_EMBS].shape[-1] for prot_ds, _ in embs_ds_list]
@@ -470,7 +478,7 @@ class DynamicPipelineExperiment(Experiment):
 			print(chi2.get_formatted_table("AGGREGATED:"))
 
 			# Saving the aggregated contingency table as LaTeX
-			with open(self._get_results_folder(self.configs) + "/contingency_tables.tex", "a") as f:
+			with open(self._get_results_folder(config) + "/contingency_tables.tex", "a") as f:
 				f.write(f"Aggregated contingency table for strategy \\emph{{strategy.value}}:\n\n")
 				f.write(chi2.get_formatted_table(f"{strategy.value}:", use_latex=True))
 				f.write("\n\n")
@@ -488,7 +496,7 @@ class DynamicPipelineExperiment(Experiment):
 
 		"""
 		# Printing the results
-		logger.info("Configurations for the experiment:\n%s", self.configs)
+		logger.info("Configurations for the experiment:\n%s", config)
 		# print(f"{Effect.BOLD}AGGREGATED RESULTS{Effect.OFF}:     AVG ± STD		over {len(embs_ds_list)} testcases")
 		# print(f"Chi-Squared value:   {chi2_averages[0]:6.3f} ± {chi2_std_devs[0]:5.3f}")
 		# print(f"{Effect.BOLD}COMBINED RESULTS{Effect.OFF}:")
