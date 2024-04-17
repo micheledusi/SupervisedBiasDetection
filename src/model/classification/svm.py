@@ -8,10 +8,15 @@
 # This module implements the AbstractClassifier class with a SVM classifier.
 # The SVM is implemented in the scikit-learn library.
 
+import logging
 from sklearn.svm import LinearSVC
 import torch
 
 from model.classification.base import AbstractClassifier, ClassesDict
+
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class BinaryClassesDict(ClassesDict):
@@ -71,7 +76,10 @@ class SVMClassifier(AbstractClassifier):
 		return features_relevance
 
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
-		self._model.fit(x, y.ravel())
+		logger.debug("X shape:", x.shape)
+		logger.debug("Y shape:", y.shape)
+		logger.debug("Y squeezed shape:", y.squeeze().shape)
+		self._model.fit(x, y.squeeze())
 
 	def _predict(self, x: torch.Tensor) -> torch.Tensor:
 		return torch.Tensor(self._model.predict(x))
