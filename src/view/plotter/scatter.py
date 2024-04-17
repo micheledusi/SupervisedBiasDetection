@@ -111,16 +111,24 @@ class DatasetPairScatterPlotter:
         self._prot_ds = protected_ds
         self._ster_ds = stereotyped_ds
 
-        # if use_latex:
-        #     plt.rc('text', usetex=True)
-        #     plt.rc('font', family='serif')
+        self._is_plot_built = False
+
+        if use_latex:
+            plt.rc('text', usetex=True)
+            plt.rc('font', family='serif')
 
 
-    def show(self) -> None:
+    def _build_plot(self) -> None:
         """
-        This method shows the plot.
+        This method builds the plot.
         """
-        plt.figure(figsize=(8, 6))
+        # If the plot has already been built, return
+        if self._is_plot_built:
+            return
+        self._is_plot_built = True
+
+        # Creating the figure
+        plt.figure(figsize=(4, 3))
 
         # PROTECTED DATASET
         # Splitting the dataset by class
@@ -147,7 +155,7 @@ class DatasetPairScatterPlotter:
             plt.scatter(ster_xs[class_label], ster_ys[class_label], c=color_dict[class_label], label=class_label)
 
         # Adding labels
-        DatasetPairScatterPlotter._annotate_words(self._prot_ds)
+        # DatasetPairScatterPlotter._annotate_words(self._prot_ds)
         # DatasetPairScatterPlotter._annotate_words(self._ster_ds)
 
         # Adding title
@@ -156,7 +164,16 @@ class DatasetPairScatterPlotter:
 
         # Showing
         plt.legend()
+    
+
+    def show(self) -> None:
+        self._build_plot()
         plt.show()
+
+
+    def save(self, filename: str) -> None:
+        self._build_plot()
+        plt.savefig(filename)
 
 
     def _annotate_words(ds: Dataset, word_col: str = COL_WORD):

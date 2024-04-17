@@ -14,7 +14,7 @@ import logging
 from experiments.dynamic_midstep import DynamicPipelineExperiment
 
 # Logging setup
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # Torch setup
 torch.manual_seed(42)
 torch.use_deterministic_algorithms(True)    # For reproducibility
@@ -25,26 +25,30 @@ datasets_logging.disable_progress_bar()
 
 from data_processing.data_reference import PropertyDataReference
 from utils.config import Configurations, Parameter
-from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED
+from utils.const import MODEL_NAME_BERT_BASE_UNCASED, MODEL_NAME_ROBERTA_BASE, MODEL_NAME_DISTILBERT_BASE_UNCASED, MODEL_NAME_ELECTRA_BASE
 
 
 PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("gender", 1, 1)
 
-# STEREOTYPED_PROPERTY = PropertyDataReference("profession", 4, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("profession", 4, 1)	# 2 CLASSES, 1700 parole
+# STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)	# 4 CLASSES, 1700 parole
+STEREOTYPED_PROPERTY = PropertyDataReference("profession", 2, 1)	# 3 CLASSES, 60 parole
 
 # PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("religion", 1, 1)
 
+# PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
+
 # PROTECTED_PROPERTY = PropertyDataReference("quality", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("quality", 1, 1)
 
-# PROTECTED_PROPERTY = PropertyDataReference("ethnicity", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("criminality", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("verb", 1, 1)
 
 #---> Controls
 # PROTECTED_PROPERTY = PropertyDataReference("dogsandcats", 1, 1)
-STEREOTYPED_PROPERTY = PropertyDataReference("dogsandcats", 1, 1)
+# STEREOTYPED_PROPERTY = PropertyDataReference("dogsandcats", 1, 1)
 
 
 configs = Configurations({
@@ -56,15 +60,15 @@ configs = Configurations({
 	Parameter.WORDS_SAMPLING_PERCENTAGE: 1.0,
 	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 1.0,
 	Parameter.TEMPLATES_POLICY: 'average',
-	Parameter.MAX_TESTCASE_NUMBER: 1,
+	Parameter.MAX_TESTCASE_NUMBER: 50,
 	# Testcase post-processing
 	Parameter.CENTER_EMBEDDINGS: False,
 	# Reduction
-	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
-	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean',
+	Parameter.REDUCTION_CLASSIFIER_TYPE: 'linear',
+	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean', # This is used only for clustering. We do not use it for now.
 	# Bias evaluation
-	Parameter.CROSS_CLASSIFIER_TYPE: 'svm',
-	Parameter.BIAS_TEST : 'chi2',
+	Parameter.CROSS_CLASSIFIER_TYPE: 'linear',
+	Parameter.BIAS_TEST: 'chi2',
 })
 
 

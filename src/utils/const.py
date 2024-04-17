@@ -27,6 +27,7 @@ TOKEN_MASK: str = "[MASK]"
 MODEL_NAME_BERT_BASE_UNCASED: str = "bert-base-uncased"
 MODEL_NAME_ROBERTA_BASE: str = "roberta-base"
 MODEL_NAME_DISTILBERT_BASE_UNCASED: str = "distilbert-base-uncased"
+MODEL_NAME_ELECTRA_BASE: str = "google/electra-base-discriminator"
 DEFAULT_MODEL_NAME: str = MODEL_NAME_BERT_BASE_UNCASED
 
 # Configurations
@@ -64,3 +65,7 @@ DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY = 'euclidean'	# 'euclidean' or 'cosine'
 COL_WORD: str = "word"
 COL_CLASS: str = "value"
 COL_EMBS: str = "embedding"
+
+# ANSI Escape codes
+import re
+ANSI_FILTER = re.compile(r'\x1b\[([0-9,A-Z]{1,2}(;[0-9]{1,2})?(;[0-9]{3})?)?[m|K]?')

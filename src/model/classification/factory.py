@@ -7,11 +7,13 @@
 
 from enum import Enum
 import logging
+
 from model.classification.base import AbstractClassifier
 
 from model.classification.linear import LinearClassifier
 from model.classification.svm import SVMClassifier
 from model.classification.tree import TreeClassifier
+from model.classification.random_forest import ForestClassifier
 from utils.config import Configurations, Parameter
 from utils.const import DEFAULT_CLASSIFIER_TYPE
 
@@ -20,6 +22,7 @@ class ClassifierType(Enum):
 	LINEAR = 'linear', LinearClassifier
 	SVM = 'svm', SVMClassifier
 	TREE = 'tree', TreeClassifier
+	FOREST = 'randomforest', ForestClassifier
 
 	def __new__(cls, str_value: str, classifier_cls):
 		obj = object.__new__(cls)

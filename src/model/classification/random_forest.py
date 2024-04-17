@@ -5,24 +5,24 @@
 #   Date:	2023				#
 # - - - - - - - - - - - - - - - #
 
-# This module implements the AbstractClassifier class with a Tree classifier.
-# The Decision Tree is implemented in the scikit-learn library.
+# This module implements the AbstractClassifier class with a Random Forest classifier.
+# The Random Forest is implemented in the scikit-learn library.
 
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 import torch
 
 from model.classification.base import AbstractClassifier, ClassesDict
 from model.classification.svm import IndexedClassesDict
 
 
-class TreeClassifier(AbstractClassifier):
+class ForestClassifier(AbstractClassifier):
 	"""
 	This class implements a classifier with a DecisionTree model (from scikit-learn library).
 	The model is trained with the 'train' method, and it can be used to predict the class of a new sample with the 'evaluate' method.
 	"""
 	def __init__(self) -> None:
 		super().__init__()
-		self._model = DecisionTreeClassifier(criterion='gini')
+		self._model = RandomForestClassifier(criterion='gini')
 
 	@property
 	def features_relevance(self) -> torch.Tensor:

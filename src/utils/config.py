@@ -361,7 +361,7 @@ class Configurations:
 		return "\n".join([get_value_string(key) for key in self.__dict])	
 	
 
-	def to_abbrstr(self, *keys: list[Parameter]) -> str:
+	def to_abbrstr(self, ignore_model: bool = True, *keys: list[Parameter]) -> str:
 		"""
 		Gets the set of configurations as a string, using the abbreviations of the parameters.
 		The parameters are separated by an underscore. The order of the parameters is the same as the order of the keys.
@@ -372,6 +372,8 @@ class Configurations:
 		"""
 		if not keys:
 			keys = self.__dict.keys()
+		if ignore_model:
+			keys = [key for key in keys if key != Parameter.MODEL_NAME]
 		vals: list[str] = [f"{key.abbr}{self.get(key)}" for key in keys]
 		return "_".join(vals)
 
