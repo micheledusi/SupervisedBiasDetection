@@ -76,12 +76,22 @@ class SVMClassifier(AbstractClassifier):
 		return features_relevance
 
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
-		logger.debug("X shape:", x.shape)
-		logger.debug("Y shape:", y.shape)
-		logger.debug("Y squeezed shape:", y.squeeze().shape)
-		self._model.fit(x, y.squeeze())
+		logger.debug(f"X shape: {x.shape}")
+		logger.debug(f"Y shape: {y.shape}")
+		# If the input tensor is 1-dimensional, we assume that the N° of features is 1. 
+  		# Thus, we need to add a dimension to it in order to fit the model
+		if len(x.shape) == 1:
+			x = x.unsqueeze(1)
+			logger.debug(f"Unsqueezing X shape: {x.shape} for training")
+		if len(y.shape) > 1 and y.shape[-1] == 1:
+			y = y.squeeze()
+			logger.debug(f"Y squeezed shape: {y.squeeze().shape}")
+		self._model.fit(x, y)
 
 	def _predict(self, x: torch.Tensor) -> torch.Tensor:
+		if len(x.shape) == 1:
+			x = x.unsqueeze(1)
+			logger.debug(f"Unsqueezing X shape: {x.shape} for prediction")
 		return torch.Tensor(self._model.predict(x))
 
 	def _compute_class_tensors(self, values: list[str]) -> ClassesDict:

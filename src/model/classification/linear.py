@@ -12,11 +12,16 @@
 # with a linear layer and a softmax function.
 
 
+import logging
 import torch
 from torch.autograd import Variable
 
 from model.classification.base import AbstractClassifier, ClassesDict
 from utils.const import DEVICE
+
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class TorchClassifier(torch.nn.Module):
@@ -98,6 +103,16 @@ class LinearClassifier(AbstractClassifier):
 		return features_relevance
 	
 	def _fit(self, x: torch.Tensor, y: torch.Tensor) -> None:
+		# Debugging information
+		logger.debug(f"X shape: {x.shape}")
+		logger.debug(f"Y shape: {y.shape}")
+		logger.debug(f"Y squeezed shape: {y.squeeze().shape}")
+		# If the input tensor is 1-dimensional, we assume that the N° of features is 1. 
+  		# Thus, we need to add a dimension to it in order to fit the model
+		if len(x.shape) == 1:
+			x = x.unsqueeze(1)
+			logger.debug(f"Unsqueezing X shape: {x.shape} for training")
+
 		# Define the model
 		input_size: int = x.shape[1]
 		output_size: int = y.shape[1]
@@ -128,6 +143,11 @@ class LinearClassifier(AbstractClassifier):
 			#	print('Epoch {} => loss = {}'.format(epoch, loss.item()))
 
 	def _predict(self, x: torch.Tensor) -> torch.Tensor:
+		# If the input tensor is 1-dimensional, we assume that the N° of features is 1. Thus, we need to add a dimension to it in order to fit the model
+		if len(x.shape) == 1:
+			x = x.unsqueeze(1)
+			logger.debug(f"Unsqueezing X shape: {x.shape} for prediction")
+
 		x_var = Variable(x)
 		outputs = self.model(x_var)
 		return outputs

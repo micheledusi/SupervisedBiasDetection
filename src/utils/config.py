@@ -9,7 +9,7 @@
 
 from enum import Enum
 import logging
-from typing import Any, Union
+from typing import Any, Self, Union
 from colorist import BgColor, Color
 
 from deprecated import deprecated
@@ -61,15 +61,52 @@ class Parameter(Enum):
 	CENTER_EMBEDDINGS = "center_embeddings", DEFAULT_CENTER_EMBEDDINGS, "CE"
 	""" Whether to center the embeddings of the testcases. If true, the embeddings are centered, i.e. the mean of the embeddings is subtracted from each embedding. """
 
+	PREREDUCE_EMBEDDINGS = "prereduce_embeddings", False, "PRE"
+	""" Whether to prereduce the embeddings of the testcases. If true, the embeddings are reduced with PCA before the bias detection analysis. """
+
+	PREREDUCTION_DIMENSIONS = "prereduction_dimensions", 20, "PreDIM"
+	""" The number of dimensions to use in the prereduction of the embeddings. """
+
 	# Reduction configurations
+ 
+	REDUCTION_STRATEGY = "reduction_strategy", None, "RED"
+	""" The strategy to use to reduce the embeddings. This can be further specified by other parameters. 
+	Possible values are: 
+	- None / "none" / "id"	: no reduction is applied
+	- "random"				: each feature is randomly selected, with a probability defined by the "reduction_dropout_percentage" parameter
+	- "pca"					: apply PCA to the embeddings
+	- "trained_pca"			: apply PCA first to the protected embeddings, then to the stereotyped embeddings
+	- "tsne"				: apply t-SNE to the embeddings
+	- "relevance_based"		: the features are selected based on their relevance. This requires the "relevance_computation_strategy" and "relevance_classifier" parameters.
+	"""
 
-	REDUCTION_CLASSIFIER_TYPE = "reduction_classifier", DEFAULT_CLASSIFIER_TYPE, "ReCL"
-	""" The classifier to use to reduce the embeddings. Possible values are `svm` and `linear`. """
+	REDUCTION_DROPOUT_PERCENTAGE = "reduction_dropout_percentage", DEFAULT_REDUCTION_DROPOUT_PERCENTAGE, "DROP"
+	""" The probability to drop a feature in the RANDOM reduction strategy. """
+ 
+	RELEVANCE_COMPUTATION_STRATEGY = "relevance_computation_strategy", DEFAULT_RELEVANCE_COMPUTATION_STRATEGY, "ReCS"
+	""" The strategy to use to compute the relevance of the features. Possible values are `from_classifier`, `shap`. """
 
-	EMBEDDINGS_DISTANCE_STRATEGY = "embeddings_distance_strategy", DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY, "EDIST"
-	""" The strategy to use to compute the distance between the embeddings. Possible values are `euclidean` and `cosine`. """
+	RELEVANCE_CLASSIFIER_TYPE = "relevance_classifier", DEFAULT_CLASSIFIER_TYPE, "ReCL"
+	""" The classifier to use to compute the features' relevance from the embeddings. """ # Possible values are `svm`, `linear`, `tree`, and `randomforest`.
 
-	#### TODO: multiple parameters need to be added here for the reduction of the embeddings
+	RELEVANCE_NORMALIZATION_STRATEGY = "relevance_normalization_strategy", DEFAULT_RELEVANCE_NORMALIZATION_STRATEGY, "NORM"
+	""" The strategy to use to normalize the relevance scores in the interval [0; 1]. """
+
+	RELEVANCE_FEATURES_SELECTION_STRATEGY = "features_selection_strategy", None, "FeSS"
+	""" The strategy to use to select the features, based on the computed relevance scores. 
+	Possible values are:
+	- top_percentile	: select the features in the top percentile of relevance scores
+	- over_threshold	: select the features with a relevance score over a certain threshold
+	- sampling			: select the features randomly, with a probability proportional to their relevance score
+	"""
+
+	RELEVANCE_PERCENTILE_OR_THRESHOLD = "relevance_threshold", DEFAULT_REDUCTION_DROPOUT_PERCENTAGE, "THR"
+	""" The threshold or the percentile to use to select the features. It is a float in the interval [0; 1].
+	The threshold is used in the "over_threshold" strategy, while the percentile is used in the "top_percentile" strategy. """
+
+	# @deprecated
+	# EMBEDDINGS_DISTANCE_STRATEGY = "embeddings_distance_strategy", DEFAULT_EMBEDDINGS_DISTANCE_STRATEGY, "EDIST"
+	# """ The strategy to use to compute the distance between the embeddings. Possible values are `euclidean` and `cosine`. """
 
 	# Bias detection analysis on reduced embeddings
 
@@ -85,7 +122,6 @@ class Parameter(Enum):
 	TEST_SPLIT_PERCENTAGE = "test_split_percentage", DEFAULT_TEST_SPLIT_PERCENTAGE, "SP"
 	CROSS_PROBABILITY_STRATEGY = "cross_probability_strategy", DEFAULT_CROSS_PROBABILITY_STRATEGY, "CR"
 	POLARIZATION_STRATEGY = "polarization_strategy", DEFAULT_POLARIZATION_STRATEGY, "PL"
-	REDUCTION_TYPE = "reduction", DEFAULT_REDUCTION_TYPE, "RD"
 
 	def __new__(cls, str_value: str, default: Any, abbr: str = None):
 		obj = object.__new__(cls)
@@ -319,6 +355,22 @@ class Configurations:
 		subdict: dict[Parameter, Any] = {key: self.get(key) for key in keys}
 		submutables: list[Parameter] = [key for key in keys if key in self.__mutables]
 		return Configurations(subdict, submutables, self.__use_base_values)
+	
+
+	def subget_without(self, *excluded_keys: list[Parameter]) -> Self:
+		"""
+		Copy the current `Configurations` object to another object without the selected parameters.
+		In other words, it gets a "subset" of the configurations.
+
+		All the other settings remain the same: if a parameter is mutable, it will be mutable in the new object as well.
+		The usage of the "base" values is the same as in the original object.
+
+		:param excluded_keys: The keys defining the subset of configurations.
+		:return: The "subset" of the configurations.
+		"""
+		subdict: dict[Parameter, Any] = {key: self.get(key) for key in self.__dict.keys() if key not in excluded_keys}
+		submutables: list[Parameter] = [key for key in self.__mutables if key not in excluded_keys]
+		return Configurations(subdict, submutables, self.__use_base_values)
 
 
 	def subget_mutables(self) -> "Configurations":
@@ -338,6 +390,21 @@ class Configurations:
 		"""
 		immutables: list[Parameter] = [key for key in self.__dict.keys() if key not in self.__mutables]
 		return self.subget(*immutables)
+	
+
+	def expand_by(self, other: "Configurations") -> "Configurations":
+		"""
+		Expands the current `Configurations` object by another object.
+		The expansion is done by adding the parameters of the other object to the current object,
+		but only if the parameter is not already present in the current object.
+		"""
+		# We clone the current configurations
+		new_configs: Configurations = Configurations(self.__dict, self.__mutables, self.__use_base_values)
+		# We add the parameters of the other object
+		for key in other.keys:
+			if key not in new_configs:
+				new_configs.__dict[key] = other.get(key)
+		return new_configs
 
 
 	def to_strdict(self) -> dict[str, Any]:
@@ -546,12 +613,15 @@ class Configurations:
 			Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE, 
 			Parameter.TEMPLATES_POLICY, 
 			Parameter.MAX_TESTCASE_NUMBER, 
+		)
+		EMBEDDINGS_PREPROCESSING = (
 			Parameter.CENTER_EMBEDDINGS,
+			Parameter.PREREDUCE_EMBEDDINGS,
+			Parameter.PREREDUCTION_DIMENSIONS,
 		)
 		""" The parameters used to configure the embeddings combination in testcases. """
 		EMBEDDINGS_REDUCTION = (
-			Parameter.REDUCTION_CLASSIFIER_TYPE,
-			Parameter.EMBEDDINGS_DISTANCE_STRATEGY,
+		 	Parameter.REDUCTION_STRATEGY,
 		)
 		""" The parameters used to configure the reduction of the embeddings. """
 		BIAS_EVALUTATION = (

@@ -18,6 +18,8 @@ from abc import ABC, abstractmethod, abstractproperty
 from datasets import Dataset
 import torch
 
+from utils.const import COL_CLASS, COL_EMBS
+
 
 class ClassesDict():
 	"""
@@ -175,7 +177,7 @@ class AbstractClassifier(ABC):
 		classes_ref: ClassesDict = self._classes
 		return torch.stack([classes_ref[value] for value in values])
 
-	def train(self, dataset: Dataset, input_column: str='embedding', output_column: str='value') -> None:
+	def train(self, dataset: Dataset, input_column: str=COL_EMBS, output_column: str=COL_CLASS) -> None:
 		"""
 		This method trains the model on a dataset of words, for which we know the value of the property.
 		The dataset must contain a column for the input values, and a column for the output values.

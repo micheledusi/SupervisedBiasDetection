@@ -8,7 +8,6 @@
 # This module offers a simple implementation of the Chi-Squared test.
 
 import logging
-import re
 from colorist import Color
 from datasets import Dataset
 from scipy import stats
@@ -16,6 +15,10 @@ from tabulate import tabulate
 import torch
 
 from utils.const import ANSI_FILTER
+
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 COLOR_PREDICTED: str = Color.RED
@@ -180,8 +183,8 @@ class ChiSquaredTest:
 			classes_2.extend(cls_2)
 		classes_1 = tuple(sorted(set(classes_1)))
 		classes_2 = tuple(sorted(set(classes_2)))
-		logging.debug(f"Classes of the first column:  {classes_1}")
-		logging.debug(f"Classes of the second column: {classes_2}")
+		logger.debug(f"Classes of the first column:  {classes_1}")
+		logger.debug(f"Classes of the second column: {classes_2}")
 
 		sum_tensor: torch.Tensor = torch.zeros(size=(len(classes_1), len(classes_2)), dtype=torch.float)
 
@@ -258,8 +261,29 @@ class HarmonicMeanPValue():
 		:param weights: The weights of the p-values. If not specified, the weights are all equal to 1/n.
 		:return: The harmonic mean of the p-values.
 		"""
+		assert len(p_values.shape) == 1, "The p-values must be a 1D tensor."
+		num_p_values = len(p_values)
+
+		# Check the weights
 		if weights is None:
-			weights = torch.ones_like(p_values) / len(p_values)
+			weights = torch.ones_like(p_values) / num_p_values
+
+		# We check whether the p-values are not NaN
+		if torch.isnan(p_values).any():
+			logger.warning("The p-values include some NaN values. The NaN values will be filtered out...")
+			logger.debug(f"Original p-values: {p_values}")
+
+			filtered_p_values = p_values[~p_values.isnan()]
+			num_filtered = len(filtered_p_values)
+			logger.warning(f"The original {num_p_values} have been filtered to {num_filtered} p-values, excluding {num_p_values - num_filtered} NaN element(s).")
+		
+			# We need to filter out the weights corresponding to NaN p-values
+			weights = weights[~p_values.isnan()]
+			weights /= torch.sum(weights)		# Normalize the weights again
+
+			# We re-assign the p-values
+			p_values = filtered_p_values
+   
 		# Compute the harmonic mean
 		harmonic_mean = torch.sum(weights) / torch.sum(weights / p_values)
 		return harmonic_mean.item()

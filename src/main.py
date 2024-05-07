@@ -33,7 +33,7 @@ PROTECTED_PROPERTY = PropertyDataReference("gender", 1, 1)
 
 # STEREOTYPED_PROPERTY = PropertyDataReference("profession", 4, 1)	# 2 CLASSES, 1700 parole
 # STEREOTYPED_PROPERTY = PropertyDataReference("profession", 3, 1)	# 4 CLASSES, 1700 parole
-STEREOTYPED_PROPERTY = PropertyDataReference("profession", 2, 1)	# 3 CLASSES, 60 parole
+# STEREOTYPED_PROPERTY = PropertyDataReference("profession", 2, 1)	# 3 CLASSES, 60 parole
 
 # PROTECTED_PROPERTY = PropertyDataReference("religion", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("religion", 1, 1)
@@ -49,6 +49,8 @@ STEREOTYPED_PROPERTY = PropertyDataReference("profession", 2, 1)	# 3 CLASSES, 60
 #---> Controls
 # PROTECTED_PROPERTY = PropertyDataReference("dogsandcats", 1, 1)
 # STEREOTYPED_PROPERTY = PropertyDataReference("dogsandcats", 1, 1)
+# PROTECTED_PROPERTY = PropertyDataReference("dogsandcats", "01-balanced", 1)
+STEREOTYPED_PROPERTY = PropertyDataReference("dogsandcats", "01-balanced", 1)
 
 
 configs = Configurations({
@@ -61,13 +63,21 @@ configs = Configurations({
 	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 1.0,
 	Parameter.TEMPLATES_POLICY: 'average',
 	Parameter.MAX_TESTCASE_NUMBER: 50,
-	# Testcase post-processing
+	# Embeddings pre-processing
 	Parameter.CENTER_EMBEDDINGS: False,
+	Parameter.PREREDUCE_EMBEDDINGS: (False, True),
+	Parameter.PREREDUCTION_DIMENSIONS: 25,
 	# Reduction
-	Parameter.REDUCTION_CLASSIFIER_TYPE: 'linear',
-	Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean', # This is used only for clustering. We do not use it for now.
+	Parameter.REDUCTION_STRATEGY: ('none', 'relevance_based'), # 'none', 'random', 'pca', 'trained_pca', 'tsne', 'relevance_based'
+	Parameter.REDUCTION_DROPOUT_PERCENTAGE: 0.5,
+	Parameter.RELEVANCE_COMPUTATION_STRATEGY: 'from_classifier', 	# 'from_classifier' or 'shap'
+	Parameter.RELEVANCE_CLASSIFIER_TYPE: 'svm',
+	Parameter.RELEVANCE_NORMALIZATION_STRATEGY: ('linear', 'linear_opposite'), # 'linear', 'linear_opposite', 'quadratic', 'quadratic_opposite', 'sigmoid', 'sigmoid_opposite', 'sigmoid_adaptive'
+	Parameter.RELEVANCE_FEATURES_SELECTION_STRATEGY: 'sampling',	# 'top_percentile', 'over_threshold', 'sampling'
+	Parameter.RELEVANCE_PERCENTILE_OR_THRESHOLD: 0.5,
+	# Parameter.EMBEDDINGS_DISTANCE_STRATEGY: 'euclidean', 			# This is used only for clustering. We do not use it for now.
 	# Bias evaluation
-	Parameter.CROSS_CLASSIFIER_TYPE: 'linear',
+	Parameter.CROSS_CLASSIFIER_TYPE: 'svm',
 	Parameter.BIAS_TEST: 'chi2',
 })
 

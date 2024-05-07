@@ -52,7 +52,7 @@ class ClassificationExperiment(Experiment):
 
 		for testcase in tqdm(range(TESTCASES_NUMBER)):
 			
-			classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
+			classifier: AbstractClassifier = ClassifierFactory(self.configs).create()
 
 			if self.configs[Parameter.TEST_SPLIT_PERCENTAGE] == 0:
 				classifier.train(embeddings)

@@ -108,13 +108,13 @@ class SeparationExperiment(Experiment):
 		# 2. Extract the weights of the classifier;
 		# 3. Select the features of the embeddings according to the highest weights;
 		# 4. Apply PCA to the shortened embeddings.
-		classifier: AbstractClassifier = ClassifierFactory.create(configs)
+		classifier: AbstractClassifier = ClassifierFactory(configs).create()
 		classifier.train(embs_dataset, input_column=embs_column)
 		embs = embs_dataset[embs_column]
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=midstep)
-		reduced_midstep_embs = reducer_1.reduce(embs)
+		reduced_midstep_embs = reducer_1.reduce_embs(embs)
 		reducer_2 = TrainedPCAReducer(reduced_midstep_embs, output_features=2)
-		reduced_embs = reducer_2.reduce(reduced_midstep_embs)
+		reduced_embs = reducer_2.reduce_embs(reduced_midstep_embs)
 
 		result_ds: Dataset = embs_dataset.remove_columns(embs_column)
 		result_ds = result_ds.add_column("embedding", reduced_embs.tolist())

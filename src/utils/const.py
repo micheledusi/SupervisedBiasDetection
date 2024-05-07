@@ -50,7 +50,10 @@ DEFAULT_CENTER_EMBEDDINGS = False
 DEFAULT_TEST_SPLIT_PERCENTAGE = 0.5
 
 # Reduction configurations
-DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm' or 'linear'
+DEFAULT_REDUCTION_DROPOUT_PERCENTAGE = 0.5
+DEFAULT_RELEVANCE_COMPUTATION_STRATEGY = 'from_classifier' # 'from_classifier' or 'shap'
+DEFAULT_CLASSIFIER_TYPE = 'svm' # 'svm', 'linear', 'tree', or 'randomforest'
+DEFAULT_RELEVANCE_NORMALIZATION_STRATEGY = 'linear' # 'linear', 'linear-opposite', 'quadratic', 'quadratic-opposite', 'sigmoid', 'sigmoid-opposite', 'sigmoid-adaptive
 DEFAULT_REDUCTION_TYPE = 'pca' # 'pca' or 'tsne'
 DEFAULT_BIAS_TEST = 'chi2' # only 'chi2' for now
 

@@ -63,12 +63,12 @@ class MidstepAnalysisChiSquared(Experiment):
 		for n in tqdm(MIDSTEPS):
 			# Instantiate the reducer from 768 to N
 			reducer_to_n = WeightsSelectorReducer.from_classifier(classifier, output_features=n)
-			midstep_prot_embs = reducer_to_n.reduce(prot_embs).to(DEVICE)
+			midstep_prot_embs = reducer_to_n.reduce_embs(prot_embs).to(DEVICE)
 			midstep_prot_dataset: Dataset = Dataset.from_dict({'embedding': midstep_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
-			midstep_ster_embs = reducer_to_n.reduce(ster_embs).to(DEVICE)
+			midstep_ster_embs = reducer_to_n.reduce_embs(ster_embs).to(DEVICE)
 			midstep_ster_dataset: Dataset = Dataset.from_dict({'embedding': midstep_ster_embs, 'value': ster_dataset['value']}).with_format('torch')	
 			# Now, we train another classifier on the reduced embeddings
-			midstep_classifier = ClassifierFactory.create(self.configs)
+			midstep_classifier = ClassifierFactory(self.configs, phase=ClassifierFactory.PHASE_CROSS).create()
 			midstep_classifier.train(midstep_prot_dataset)
 			midstep_ster_predictions = midstep_classifier.evaluate(midstep_ster_dataset)['prediction']
 			midstep_predicted_values = [midstep_classifier.classes[pred] for pred in midstep_ster_predictions]

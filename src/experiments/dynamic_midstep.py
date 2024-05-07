@@ -8,7 +8,6 @@
 # This module is responsible for a general experiment.
 # In this experiment, we try several strategies to choose the best value of the midstep a priori.
 
-from enum import Enum
 import logging
 from colorist import Color
 from datasets import Dataset, concatenate_datasets
@@ -23,17 +22,20 @@ from model.embedding.center import EmbeddingCenterer
 from model.embedding.cluster_validator import ClusteringScorer
 from model.embedding.combinator import EmbeddingsCombinator
 from model.reduction.base import BaseDimensionalityReducer
-from model.reduction.pca import PCAReducer, TrainedPCAReducer
+from model.reduction.factory import ReductionFactory
+from model.reduction.pca import JointPCAReducer, TrainedPCAReducer
 from model.reduction.weights import WeightsSelectorReducer
+from model.relevance.base import BaseRelevanceCalculator
+from model.relevance.factory import RelevanceCalculatorFactory
+from model.relevance.normalize import RelevanceNormalizer
 from utils.caching.creation import get_cached_raw_embeddings
-from utils.config import Configurations
-from utils.const import COL_EMBS
+from utils.config import Configurations, Parameter
 from view.plotter.scatter import DatasetPairScatterPlotter
 from view.plotter.weights import WeightsPlotter
 
 # Logging setup
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 
 REBUILD_DATASETS = False
@@ -41,27 +43,10 @@ REBUILD_DATASETS = False
 DO_PLOT = False
 DO_SHOW_PLOT = DO_PLOT and False
 DO_SAVE_PLOT = DO_PLOT and False
-DO_PLOT_FOR_LATEX = DO_PLOT and True
+DO_PLOT_FOR_LATEX = DO_PLOT and False
 
 DO_CHI2 = True
 DO_PRINT_CONTINGENCY_TABLE = True
-
-class ReductionStrategy(Enum):
-	NONE = "none"
-	RANDOM_SAMPLING = "random_sampling"
-	RELEVANT_SAMPLING = "relevant_sampling"
-	ANTI_RELEVANT_SAMPLING = "anti_relevant_sampling"
-	SQUARED_RELEVANT_SAMPLING = "squared_relevant_sampling"
-	SQUARED_ANTI_RELEVANT_SAMPLING = "squared_anti_relevant_sampling"
-	ENHANCED_RELEVANT_SAMPLING = "enhanced_relevant_sampling"					#@deprecated
-	ENHANCED_ANTI_RELEVANT_SAMPLING = "enhanced_anti_relevant_sampling"			#@deprecated
-	# TOP_N_WITH_BEST_CHOICE = "top_n_with_best_choice" 						#@deprecated
-	# ANTI_TOP_N_WITH_BEST_CHOICE = "anti_top_n_with_best_choice"				#@deprecated
-	# PCA2 = "pca_2"
-	TRAINED_PCA2 = "trained_pca_2"
-	RELEVANT_SAMPLING_PLUS_TRAINED_PCA2 = "relevant_sampling_plus_trained_pca2"
-	# SQUARED_RELEVANT_SAMPLING_PLUS_TRAINED_PCA2 = "squared_relevant_sampling_plus_trained_pca2"
-	HALF_TOP_N = "half_top_n"
 
 
 class DynamicPipelineExperiment(Experiment):
@@ -78,7 +63,6 @@ class DynamicPipelineExperiment(Experiment):
 			configs=configs
 			)
 		self.weights_already_plotted = False
-		self.testcase_results_ds: Dataset = None
 
 
 	def _execute(self, **kwargs) -> None:	
@@ -98,30 +82,46 @@ class DynamicPipelineExperiment(Experiment):
 			combined_protected_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(protected_property_ds)
 			combined_stereotyped_embeddings: dict[Configurations, list[Dataset]] = combinator.combine(stereotyped_property_ds)
 
-			# Centering the embeddings
-			# For each configuration of the combined embeddings:
+			# Now we have the combined embeddings, we can proceed with the preprocessing and the bias detection
 			for key_configs in combined_protected_embeddings:
-				centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
-				# Centering the embeddings for each testcase
-				combined_protected_embeddings[key_configs] = [centerer.center(ds) for ds in combined_protected_embeddings[key_configs]]
-			for key_configs in combined_stereotyped_embeddings:
-				centerer: EmbeddingCenterer = EmbeddingCenterer(key_configs)
-				# Centering the embeddings for each testcase
-				combined_stereotyped_embeddings[key_configs] = [centerer.center(ds) for ds in combined_stereotyped_embeddings[key_configs]]	
-
-			# Now we have the combined embeddings, we can proceed with the bias detection
-			for key_configs in combined_protected_embeddings:
-				print(f"Running experiment for configuration:\n{key_configs}")
 
 				# We assume that the keys of the two dictionaries are the same
 				# Meaning that the configurations are the same for both the protected and the stereotyped property
 				protected_embs_ds_list: list[Dataset] = combined_protected_embeddings[key_configs]
 				stereotyped_embs_ds_list: list[Dataset] = combined_stereotyped_embeddings[key_configs]
 
-				self._execute_for_single_configuration(key_configs, protected_embs_ds_list, stereotyped_embs_ds_list)
+				for curr_preproc_configs in key_configs.iterate_over([Parameter.CENTER_EMBEDDINGS, Parameter.PREREDUCE_EMBEDDINGS]):
+
+					# Centering the embeddings
+					if curr_preproc_configs[Parameter.CENTER_EMBEDDINGS]:
+						centerer: EmbeddingCenterer = EmbeddingCenterer(curr_preproc_configs)
+						protected_embs_ds_list: list[Dataset] = [centerer.center(ds) for ds in protected_embs_ds_list]
+						stereotyped_embs_ds_list: list[Dataset] = [centerer.center(ds) for ds in stereotyped_embs_ds_list]
+					
+					# Pre-reducting the embeddings with PCA
+					if curr_preproc_configs[Parameter.PREREDUCE_EMBEDDINGS]:
+						# We iterate over the number of dimensions to reduce the embeddings to
+						for curr_preproc_bydim_configs in curr_preproc_configs.iterate_over([Parameter.PREREDUCTION_DIMENSIONS]):
+							# Now we reduce by this number of dimensions
+							prereduce_dims: int = curr_preproc_bydim_configs[Parameter.PREREDUCTION_DIMENSIONS]
+							pca_prereducer = JointPCAReducer(output_features=prereduce_dims)
+							new_protected_embs_ds_list: list[Dataset] = []
+							new_stereotyped_embs_ds_list: list[Dataset] = []
+							for prot_ds, ster_ds in zip(protected_embs_ds_list, stereotyped_embs_ds_list):
+								prot_ds, ster_ds = pca_prereducer.reduce_both_ds(prot_ds, ster_ds)
+								new_protected_embs_ds_list.append(prot_ds)
+								new_stereotyped_embs_ds_list.append(ster_ds)
+
+							# We run the experiment for each configuration of the embeddings
+							logger.info(f"Running experiment for configuration:\n{curr_preproc_bydim_configs}")
+							self._execute_for_single_configuration(curr_preproc_bydim_configs, new_protected_embs_ds_list, new_stereotyped_embs_ds_list)
+					else:
+						# We run the experiment for each configuration of the embeddings
+						logger.info(f"Running experiment for configuration:\n{curr_preproc_configs}")
+						self._execute_for_single_configuration(curr_preproc_configs, protected_embs_ds_list, stereotyped_embs_ds_list)
 
 
-	def _execute_for_single_configuration(self, current_configs: Configurations, prot_embs_ds_list: list[Dataset], ster_embs_ds_list: list[Dataset]) -> None:
+	def _execute_for_single_configuration(self, configs: Configurations, prot_embs_ds_list: list[Dataset], ster_embs_ds_list: list[Dataset]) -> None:
 		"""
 		Executes the experiment for a single configuration of the embeddings.
 
@@ -129,296 +129,89 @@ class DynamicPipelineExperiment(Experiment):
 		:param ster_embs_ds_list: The list of datasets of the stereotyped embeddings.
 		"""
 		# Phase 1: the reduction step
-		reduced_embs_ds_by_strategy: dict[ReductionStrategy, list[tuple[Dataset, Dataset]]] = {strategy: [] for strategy in ReductionStrategy}
+		reduced_embs_ds_pair_list_by_configs: dict[Configurations, list[tuple[Dataset, Dataset]]] = {}
+		reducer_factory = ReductionFactory(configs)
 
 		# This cycle is executed for each testcase
 		for prot_embs_ds, ster_embs_ds in tqdm(zip(prot_embs_ds_list, ster_embs_ds_list), desc="Reduction step", total=len(prot_embs_ds_list)):
-			# Each testcase is reduced with different strategies
-			reduction_results: dict = self._execute_reduction(prot_embs_ds, ster_embs_ds)
-			# The result of each strategy is collected, along with the results of the other testcases for the same strategy
-			for strategy, reduced_embs_ds in reduction_results.items():
-				reduced_embs_ds_by_strategy[strategy].append(reduced_embs_ds)
+   
+			# Phase 1.2: the reduction step with the selected strategy
+			# We retrieve the list of reducers to use for the reduction step
+			# The reducers are created with the configurations of the experiment, by the factory "ReductionFactory"
+			for reducer_config, reducer in reducer_factory.create_multiple().items():
+				if reducer.requires_training:
+					reducer.train_ds(prot_embs_ds)
+				reduced_prot_embs_ds, reduced_ster_embs_ds = reducer.reduce_both_ds(prot_embs_ds, ster_embs_ds)
+				# We save the reduced embeddings for each testcase
+				if reducer_config not in reduced_embs_ds_pair_list_by_configs:
+					reduced_embs_ds_pair_list_by_configs[reducer_config] = []
+				reduced_embs_ds_pair_list_by_configs[reducer_config].append((reduced_prot_embs_ds, reduced_ster_embs_ds))
+
+		# DEBUG
+		logger.debug(f"After the reductions, we obtained:")
+		for key, value in reduced_embs_ds_pair_list_by_configs.items():
+			logger.debug(f"Configuration: {key}")
+			for prot_embs_ds, ster_embs_ds in value:
+				logger.debug(f"Reduced protected embeddings:   {prot_embs_ds}")
+				logger.debug(f"Reduced stereotyped embeddings: {ster_embs_ds}")
 
 		# Phase 1.5: plotting the reduced embeddings with the ScatterPlotter
 		if DO_PLOT:
 			# For each strategy
-			for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
-				print(f"Plotting embeddings for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+			for reducer_config, reduced_embs_ds_pair_list in reduced_embs_ds_pair_list_by_configs.items():
 				# For each testcase in this strategy
-				for prot_embs_ds, ster_embs_ds in reduced_embs_ds_list:
-					self._execute_plotting(strategy, prot_embs_ds, ster_embs_ds)
+				for (prot_embs_ds, ster_embs_ds) in reduced_embs_ds_pair_list:
+					self._execute_plotting(reducer_config.to_abbrstr(), prot_embs_ds, ster_embs_ds)
 					break	# We plot only the first testcase
 		
 		# Phase 2: crossing the protected embeddings with the stereotyped embeddings to measure the bias
 		if DO_CHI2:
-			# If we have multiple strategies for the bias evaluation, we need to execute the experiment for each of them
-			for bias_eval_config in current_configs.iterate_over(Configurations.ParametersSelection.BIAS_EVALUTATION):
+			# For each configuration/reducer
+			for reducer_config, reduced_embs_ds_pair_list in reduced_embs_ds_pair_list_by_configs.items():
+				# If we have multiple strategies for the bias evaluation, we need to execute the experiment for each of them
+				for bias_eval_config in reducer_config.iterate_over(Configurations.ParametersSelection.BIAS_EVALUTATION):
 
-				# For each strategy
-				for strategy, reduced_embs_ds_list in reduced_embs_ds_by_strategy.items():
-					print(f"Computing Chi-Squared value for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+					strategy_str: str = reducer_factory.get_strategy_str(bias_eval_config)
+					logger.info(f"Computing Chi-Squared value for STRATEGY: {Color.GREEN}{strategy_str}{Color.OFF}")
 					# print(f"Configurations: {bias_eval_config}")
 
-					strategy_results: dict = self._execute_crossing(bias_eval_config, strategy, reduced_embs_ds_list)
-					strategy_results['strategy'] = strategy.value
-					self.results_collector.collect(bias_eval_config, strategy_results)
+					# Computing the bias evaluation
+					strategy_results: dict = self._execute_crossing(bias_eval_config, reduced_embs_ds_pair_list)
 
-					print(f"Results for STRATEGY: {Color.GREEN}{strategy.name}{Color.OFF}")
+					# Printing the results
+					print(f"Results for REDUCTION STRATEGY: {Color.GREEN}{strategy_str}{Color.OFF}")
 					for key, value in strategy_results.items():
-						print(f"{Color.CYAN}{key:<22s}{Color.OFF}: {value}")
-			
-				# Saving the results of the testcases
-				if self.testcase_results_ds:
-					self.testcase_results_ds.to_csv(self._get_results_folder(bias_eval_config) + f"/testcases_results_{bias_eval_config.to_abbrstr()}.csv")
-					self.testcase_results_ds = None
+						str_value = f"{Color.YELLOW}{value:.10e}{Color.OFF}" if key == "harmonic_mean_p_value" else value
+						print(f"{Color.CYAN}{key:<22s}{Color.OFF}: {str_value}")
+
+					# Saving the results
+					strategy_results["strategy_description"] = strategy_str
+					self.results_collector.collect(bias_eval_config.expand_by(configs), strategy_results, remove_list_parameters=True)
 
 
-	def _execute_plotting(self, strategy: ReductionStrategy, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> None:
+
+	def _execute_plotting(self, strategy_str: str, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> None:
 		"""
 		Executes the plotting step of the experiment.
 		"""
 		# Reduction based on PCA (trained on the protected embeddings)
-		bidim_reducer: BaseDimensionalityReducer = TrainedPCAReducer(prot_embs_ds[COL_EMBS], output_features=2)
+		bidim_reducer: BaseDimensionalityReducer = TrainedPCAReducer(output_features=2)
 		reduced_prot_embs_ds: Dataset = bidim_reducer.reduce_ds(prot_embs_ds)
 		reduced_ster_embs_ds: Dataset = bidim_reducer.reduce_ds(ster_embs_ds)
 		
 		# Plotting the reduced embeddings
 		plotter: DatasetPairScatterPlotter = DatasetPairScatterPlotter(reduced_prot_embs_ds, reduced_ster_embs_ds,
-			title=f"Reduced embeddings for strategy: {strategy.value}", use_latex=DO_PLOT_FOR_LATEX)
+			title=f"Reduced embeddings for strategy: {strategy_str}", use_latex=DO_PLOT_FOR_LATEX)
 		# plotter.show()
 		extension: str = "pdf" if DO_PLOT_FOR_LATEX else "png"
-		img_filename = self._get_results_folder(self.configs) + f"/plot_scatter_{strategy.value}.{extension}"
+		img_filename = self._get_results_folder(self.configs) + f"/plot_scatter_{strategy_str}.{extension}"
 		if DO_SHOW_PLOT:
 			plotter.show()
 		if DO_SAVE_PLOT:
 			plotter.save(img_filename)
 
 
-	def _execute_reduction(self, prot_embs_ds: Dataset, ster_embs_ds: Dataset) -> dict[ReductionStrategy, DatasetPair]:
-		"""
-		Executes the reduction step, with different strategies.
-
-		:param prot_embs_ds: The dataset of the protected embeddings.
-		:param ster_embs_ds: The dataset of the stereotyped embeddings.
-		:return: A dictionary containing the datasets of the protected and stereotyped embeddings after the reduction step.
-		Each key represents the strategy used for the reduction.
-		"""
-		reduced_embs: dict[str, tuple[Dataset, Dataset]] = {}
-
-		# No reduction
-		reduced_embs[ReductionStrategy.NONE] = (prot_embs_ds, ster_embs_ds)
-
-		# Random sampling
-		# Select a random subset of the features
-		# We need an array of equal probabilities (0.5), one for each feature
-		equal_probabilities = 0.5 * torch.ones(size=(prot_embs_ds[COL_EMBS].shape[-1],))
-		reduced_embs[ReductionStrategy.RANDOM_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, equal_probabilities)
-
-		# Getting the relevance of the features
-		relevance: torch.Tensor = self._compute_relevance(prot_embs_ds)
-		relevance_probabilities = DynamicPipelineExperiment._normalize_relevance(relevance)		# Ensuring that the relevance is in the range [0, 1]
-		anti_relevance_probabilities = 1 - relevance_probabilities								# The anti-relevance is the complement of the relevance
-		squared_relevance_probabilities = relevance_probabilities ** 2							# The squared probabilities, to enhance the relevance
-		squared_anti_relevance_probabilities = anti_relevance_probabilities ** 2				# The squared probabilities, to enhance the anti-relevance
-
-		# Plotting the relevance
-		if not self.weights_already_plotted:
-			relevances_dict: dict[str, torch.Tensor] = {
-				"Relevance probabilities": relevance_probabilities,
-				"Anti-relevance probabilities": anti_relevance_probabilities,
-				"Squared relevance probabilities": squared_relevance_probabilities,
-				"Squared anti-relevance probabilities": squared_anti_relevance_probabilities,
-				}
-			WeightsPlotter(relevances_dict).show()
-			self.weights_already_plotted = True
-
-		# For each feature, we sample it with a probability equal to its relevance
-		reduced_embs[ReductionStrategy.RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, relevance_probabilities)
-
-		# For each feature, we sample it with a probability equal to 1 - its relevance
-		reduced_embs[ReductionStrategy.ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, anti_relevance_probabilities)
-
-		# For each feature, we sample it with a probability equal to its relevance squared
-		reduced_embs[ReductionStrategy.SQUARED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_relevance_probabilities)
-
-		# For each feature, we sample it with a probability equal to its anti-relevance squared
-		reduced_embs[ReductionStrategy.SQUARED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, squared_anti_relevance_probabilities)
-
-		""" ENHANCED SAMPLING STRATEGIES """
-
-		# For each feature, we sample it with a probability equal to its relevance
-		reduced_embs[ReductionStrategy.ENHANCED_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds, 
-			DynamicPipelineExperiment._enhance_probabilities(relevance_probabilities))
-
-		# For each feature, we sample it with a probability equal to 1 - its relevance
-		anti_relevance_probabilities = 1 - relevance_probabilities
-		reduced_embs[ReductionStrategy.ENHANCED_ANTI_RELEVANT_SAMPLING] = self._sample_with_probability(prot_embs_ds, ster_embs_ds,
-			DynamicPipelineExperiment._enhance_probabilities(anti_relevance_probabilities))
-
-		"""
-		@deprecated
-		
-		# We choose the best value for N
-		best_n: int = self._choose_best_n(prot_embs_ds, relevance)
-		# We select the N features with the highest relevance
-		top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(relevance, best_n)
-		reduced_embs[ReductionStrategy.TOP_N_WITH_BEST_CHOICE] = top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
-
-		# We select the N features with the lowest relevance
-		anti_relevance = 1 / relevance
-		anti_top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(anti_relevance, best_n)
-		reduced_embs[ReductionStrategy.ANTI_TOP_N_WITH_BEST_CHOICE] = anti_top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), anti_top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
-		"""
-		
-		# We apply PCA (2 dims) to the concatenation of the protected and the stereotyped embeddings
-		prot_ster_embs_ds: Dataset = concatenate_datasets([prot_embs_ds, ster_embs_ds]).with_format("torch")
-		original_dimension: int = prot_ster_embs_ds[COL_EMBS].shape[-1]
-		"""
-		pca2_reducer: BaseDimensionalityReducer = PCAReducer(input_features=original_dimension, output_features=2)
-		reduced_prot_ster_embs_ds: Dataset = pca2_reducer.reduce_ds(prot_ster_embs_ds)
-		reduced_prot_embs_ds: Dataset = reduced_prot_ster_embs_ds.select(range(len(prot_embs_ds)))
-		reduced_ster_embs_ds: Dataset = reduced_prot_ster_embs_ds.select(range(len(prot_embs_ds), len(prot_ster_embs_ds)))
-		reduced_embs[ReductionStrategy.PCA2] = reduced_prot_embs_ds, reduced_ster_embs_ds
-		"""
-
-		# We apply PCA (2 dims) first to the protected embeddings, and then to the stereotyped embeddings
-		trained_pca2_reducer: BaseDimensionalityReducer = TrainedPCAReducer(prot_embs_ds[COL_EMBS], output_features=2)
-		reduced_prot_embs_ds = trained_pca2_reducer.reduce_ds(prot_embs_ds)
-		reduced_ster_embs_ds = trained_pca2_reducer.reduce_ds(ster_embs_ds)
-		reduced_embs[ReductionStrategy.TRAINED_PCA2] = reduced_prot_embs_ds, reduced_ster_embs_ds
-
-		# Applying the relevant sampling and then the trained PCA (2 dims)
-		reduced_prot_embs_ds, reduced_ster_embs_ds = reduced_embs[ReductionStrategy.RELEVANT_SAMPLING]
-		trained_pca2_reducer = TrainedPCAReducer(reduced_prot_embs_ds[COL_EMBS], output_features=2)
-		reduced_prot_embs_ds = trained_pca2_reducer.reduce_ds(reduced_prot_embs_ds)
-		reduced_ster_embs_ds = trained_pca2_reducer.reduce_ds(reduced_ster_embs_ds)
-		reduced_embs[ReductionStrategy.RELEVANT_SAMPLING_PLUS_TRAINED_PCA2] = reduced_prot_embs_ds, reduced_ster_embs_ds
-
-		"""
-		# Applying the squared relevant sampling and then the trained PCA (2 dims)
-		reduced_prot_embs_ds, reduced_ster_embs_ds = reduced_embs[ReductionStrategy.SQUARED_RELEVANT_SAMPLING]
-		trained_pca2_reducer = TrainedPCAReducer(reduced_prot_embs_ds[COL_EMBS], output_features=2)
-		reduced_prot_embs_ds = trained_pca2_reducer.reduce_ds(reduced_prot_embs_ds)
-		reduced_ster_embs_ds = trained_pca2_reducer.reduce_ds(reduced_ster_embs_ds)
-		reduced_embs[ReductionStrategy.SQUARED_RELEVANT_SAMPLING_PLUS_TRAINED_PCA2] = reduced_prot_embs_ds, reduced_ster_embs_ds
-		"""
-		
-		# We select the top N/2 features with the highest relevance
-		half_n: int = original_dimension // 2
-		top_n_relevant_features_reducer = WeightsSelectorReducer.from_weights(relevance, half_n)
-		reduced_embs[ReductionStrategy.HALF_TOP_N] = top_n_relevant_features_reducer.reduce_ds(prot_embs_ds), top_n_relevant_features_reducer.reduce_ds(ster_embs_ds)
-
-		return reduced_embs
-
-
-	@staticmethod
-	def _normalize_relevance(relevance: torch.Tensor) -> torch.Tensor:
-		"""
-		Maps the relevance values to the range [0, 1].
-		It assures that the minimum value is 0 and the maximum value is 1.
-
-		:param relevance: The relevance values to normalize.
-		:return: The normalized relevance values.
-		"""
-		rel_min = relevance.min()
-		return (relevance - rel_min) / (relevance.max() - rel_min)
-
-
-	@staticmethod
-	def _enhance_probabilities(probabilities: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
-		"""
-		Enhances the probabilities by subtracting the mean and applying the sigmoid function.
-
-		:param probabilities: The probabilities to enhance.
-		:return: The enhanced probabilities.
-		"""
-		return torch.sigmoid(probabilities - threshold)
-
-
-	def _choose_best_n(self, prot_embs_ds: Dataset, relevance: torch.Tensor) -> int:
-		"""
-		Chooses the best value for N, i.e. the number of features to keep after the reduction step.
-
-		:param prot_embs_ds: The dataset of the protected embeddings.
-		:return: The best value for N.
-		"""
-		logger.debug(f"Relevance shape: {relevance.shape}")
-		possible_n_values = range(1, prot_embs_ds[COL_EMBS].shape[-1] + 1)
-		logger.debug(f"Possible N values: {possible_n_values}")
-		scorer: ClusteringScorer = ClusteringScorer(self.configs)
-		results = {n: self._compute_clustering_score(prot_embs_ds, n, relevance, scorer) for n in possible_n_values}
-		
-		# # DEBUG
-		# x = list(results.keys())
-		# y = list(results.values())
-		# import matplotlib.pyplot as plt
-		# fig, ax = plt.subplots()
-		# ax.plot(x, y)
-		# ax.set(xlabel='N', ylabel='Separation score', title='Separation score for different values of N')
-		# ax.grid()
-		# plt.show()
-
-		best_n = max(results, key=results.get)
-		return best_n
-
-	
-	def _compute_clustering_score(self, prot_embs_ds: Dataset, n: int, relevance: torch.Tensor, scorer: ClusteringScorer) -> float:
-		"""
-		Computes the separation score for the given value of N.
-		The higher the score, the more the embeddings are separated in classes.
-
-		:param prot_embs_ds: The dataset of the protected embeddings.
-		:param n: The value of N to use for the reduction.
-		:param relevance: The relevance of the features.
-		:param scorer: The scorer to use for the computation of distances.
-		:return: The score for the given value of N.
-		"""
-		reducer = WeightsSelectorReducer.from_weights(relevance, n)
-		reduced_prot_embs_ds = reducer.reduce_ds(prot_embs_ds)
-		return scorer.compute_clustering_score(reduced_prot_embs_ds, "value", COL_EMBS)
-
-
-	def _compute_relevance(self, prot_embs_ds: Dataset) -> torch.Tensor:
-		"""
-		Computes the relevance of the features, for the embeddings in the dataset.
-
-		:param prot_embs_ds: The dataset of the protected embeddings.
-		:return: A tensor containing the relevance of each feature for the embeddings in the dataset.
-		"""
-		reduction_classifier: AbstractClassifier = ClassifierFactory.create(self.configs, phase=ClassifierFactory.PHASE_REDUCTION)
-		reduction_classifier.train(prot_embs_ds)
-		return reduction_classifier.features_relevance
-	
-
-	def _sample_with_probability(self, prot_embs_ds: Dataset, ster_embs_ds: Dataset, probabilities: torch.Tensor) -> tuple[Dataset, Dataset]:
-		"""
-		Samples the embeddings in the dataset with a probability equal to the given array.
-
-		:param prot_embs_ds: The dataset of the protected embeddings.
-		:param ster_embs_ds: The dataset of the stereotyped embeddings.
-		:param probabilities: The probabilities to use for the sampling.
-		:return: The datasets of embeddings after the sampling.
-		"""
-		mask = torch.rand(size=(len(probabilities),)) < probabilities
-		logger.debug(f"Mask shape: {mask.shape}")
-		indices = torch.nonzero(mask).squeeze()
-		logger.debug(f"Indices shape: {indices.shape}")
-		prot_embs: torch.Tensor = prot_embs_ds[COL_EMBS]
-		ster_embs: torch.Tensor = ster_embs_ds[COL_EMBS]
-		logger.debug(f"Prot embs shape: {prot_embs.shape}")
-		logger.debug(f"Ster embs shape: {ster_embs.shape}")
-		reduced_prot_embs_ds: Dataset = prot_embs_ds\
-			.remove_columns(COL_EMBS)\
-			.add_column(COL_EMBS, prot_embs[:, indices].tolist())
-		reduced_ster_embs_ds: Dataset = ster_embs_ds\
-			.remove_columns(COL_EMBS)\
-			.add_column(COL_EMBS, ster_embs[:, indices].tolist())
-		logger.debug(f"Reduced prot embs shape: {(reduced_prot_embs_ds[COL_EMBS]).shape}")
-		logger.debug(f"Reduced ster embs shape: {(reduced_ster_embs_ds[COL_EMBS]).shape}")
-		return reduced_prot_embs_ds, reduced_ster_embs_ds
-
-
-	def _execute_crossing(self, config: Configurations, strategy: ReductionStrategy, embs_ds_list: list[tuple[Dataset, Dataset]]) -> dict[str, float]:
+	def _execute_crossing(self, config: Configurations, embs_ds_list: list[tuple[Dataset, Dataset]]) -> dict[str, float]:
 		"""
 		Compares the protected embeddings with the stereotyped embeddings to measure the bias.
 		The comparison is done using the chi-squared test for each testcase.
@@ -435,7 +228,8 @@ class DynamicPipelineExperiment(Experiment):
 		for prot_dataset, ster_dataset in embs_ds_list:
 
 			# Creating and training the reduction classifier
-			classifier: AbstractClassifier = ClassifierFactory.create(config, phase=ClassifierFactory.PHASE_CROSS)
+			factory: ClassifierFactory = ClassifierFactory(config, phase=ClassifierFactory.PHASE_CROSS)
+			classifier: AbstractClassifier = factory.create()
 			classifier.train(prot_dataset)
 
 			# We evaluate the predictions of the classifier on the stereotyped embeddings
@@ -455,34 +249,35 @@ class DynamicPipelineExperiment(Experiment):
 		logger.debug(f"List of Chi-Squared values: {chi2_values_list}")
 		logger.debug(f"Averages of the previous list: {chi2_averages}")
 		
-		# Saving the testcases results along with the number of dimensions
-		num_features_list: list[int] = [prot_ds[COL_EMBS].shape[-1] for prot_ds, _ in embs_ds_list]
-		testcase_results: Dataset = Dataset.from_dict({
-			"strategy": [strategy.value] * len(embs_ds_list),
-			"num_features": num_features_list,
-			"chi2": chi2_values_list.select(dim=1, index=0),
-			"p_value": chi2_values_list.select(dim=1, index=1),
-		})
-		if not self.testcase_results_ds:
-			self.testcase_results_ds = testcase_results
-		else:
-			self.testcase_results_ds = concatenate_datasets([self.testcase_results_ds, testcase_results])
-
+		"""
+		# # Saving the testcases results along with the number of dimensions
+		# num_features_list: list[int] = [prot_ds[COL_EMBS].shape[-1] for prot_ds, _ in embs_ds_list]
+		# testcase_results: Dataset = Dataset.from_dict({
+		# 	"strategy": [strategy_str] * len(embs_ds_list),
+		# 	"num_features": num_features_list,
+		# 	"chi2": chi2_values_list.select(dim=1, index=0),
+		# 	"p_value": chi2_values_list.select(dim=1, index=1),
+		# })
+		# if not self.testcase_results_ds:
+		# 	self.testcase_results_ds = testcase_results
+		# else:
+		# 	self.testcase_results_ds = concatenate_datasets([self.testcase_results_ds, testcase_results])
 		"""
 		# Averaging the contingency tables
-		logger.debug(f"Averaging the contingency tables for strategy {strategy.value} over {len(contingency_tables_list)} testcases...")
-		aggregated_contingency_table = ChiSquaredTest.average_contingency_matrices(contingency_tables_list)
-		aggregated_table_chi2_results = chi2.test_from_contingency_table(aggregated_contingency_table)
-
 		if DO_PRINT_CONTINGENCY_TABLE:
+			strategy_str = ReductionFactory(config).get_strategy_str(config)
+			logger.debug(f"Averaging the contingency tables for strategy {strategy_str} over {len(contingency_tables_list)} testcases...")
+			aggregated_contingency_table = ChiSquaredTest.average_contingency_matrices(contingency_tables_list)
+			aggregated_table_chi2_results = chi2.test_from_contingency_table(aggregated_contingency_table)
+
 			print(chi2.get_formatted_table("AGGREGATED:"))
 
 			# Saving the aggregated contingency table as LaTeX
 			with open(self._get_results_folder(config) + "/contingency_tables.tex", "a") as f:
-				f.write(f"Aggregated contingency table for strategy \\emph{{strategy.value}}:\n\n")
-				f.write(chi2.get_formatted_table(f"{strategy.value}:", use_latex=True))
+				f.write(f"Aggregated contingency table for strategy \\emph{{{strategy_str}}}:\n\n")
+				f.write(chi2.get_formatted_table(f"STRATEGY:", use_latex=True))
 				f.write("\n\n")
-		"""
+		
 
 		"""
 		# Combining the results with the Fisher's method

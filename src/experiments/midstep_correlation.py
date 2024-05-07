@@ -36,7 +36,7 @@ from deprecated import deprecated
 configurations = Configurations({
 	Parameter.MAX_TOKENS_NUMBER: 'all',
 	Parameter.TEMPLATES_PER_WORD_SAMPLING_PERCENTAGE: 'all',
-	Parameter.REDUCTION_CLASSIFIER_TYPE: 'svm',
+	Parameter.RELEVANCE_CLASSIFIER_TYPE: 'svm',
 	Parameter.CROSS_PROBABILITY_STRATEGY: 'pppl',
 	Parameter.POLARIZATION_STRATEGY: ['difference', 'ratio'],
 })
@@ -90,12 +90,12 @@ class MidstepAnalysisCorrelation(Experiment):
 		# Creating the reducer
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=midstep)
 		prot_input: torch.Tensor = prot_emb['embedding'].to(DEVICE)
-		reduced_protected_embeddings = reducer_1.reduce(prot_input).to(DEVICE)
+		reduced_protected_embeddings = reducer_1.reduce_embs(prot_input).to(DEVICE)
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
 		reducer = CompositeReducer([reducer_1, reducer_2])
 
 		# Using the reducer to reduce the stereotyped embeddings
-		return reducer.reduce(stere_emb['embedding'])
+		return reducer.reduce_embs(stere_emb['embedding'])
 
 	def _compute_correlation(self, reduced_embeddings: torch.Tensor, polarization_scores: torch.Tensor) -> torch.Tensor:
 		"""
@@ -137,7 +137,7 @@ class MidstepAnalysisCorrelation(Experiment):
 			self._check_correspondence(ster_dataset, cross_scores)
 
 			# Creating and training the classifier
-			classifier: AbstractClassifier = ClassifierFactory.create(configs)
+			classifier: AbstractClassifier = ClassifierFactory(configs).create()
 			classifier.train(prot_dataset)
 
 			# For each polarization column, we compute the correlations
@@ -241,13 +241,13 @@ class MidstepAnalysisCorrelation(Experiment):
 		
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=n_max)
 		prot_input: torch.Tensor = prot_dataset['embedding'].to(DEVICE)
-		reduced_protected_embeddings = reducer_1.reduce(prot_input).to(DEVICE)
+		reduced_protected_embeddings = reducer_1.reduce_embs(prot_input).to(DEVICE)
 		reducer_2: TrainedPCAReducer = TrainedPCAReducer(reduced_protected_embeddings, output_features=2)
 		reducer = CompositeReducer([reducer_1, reducer_2])
 
 		# Using the reducer to reduce BOTH protected and stereotyped embeddings
 		all_embeddings = torch.cat((ster_dataset['embedding'], prot_dataset['embedding']))
-		reduced_embeddings = reducer.reduce(all_embeddings).to(DEVICE)
+		reduced_embeddings = reducer.reduce_embs(all_embeddings).to(DEVICE)
 		print("Reduced embeddings shape:", reduced_embeddings.shape)
 
 		first_coord = reduced_embeddings[:, 0].tolist()

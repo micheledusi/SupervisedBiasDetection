@@ -9,36 +9,8 @@
 
 import torch
 
-from model.reduction.base import BaseDimensionalityReducer
 from model.classification.base import AbstractClassifier
-from utils.const import DEVICE
-
-
-class SelectorReducer(BaseDimensionalityReducer):
-	"""
-	The reduction of this class is made by taking the features with specified indices.
-	"""
-
-	def __init__(self, input_features: int, indices: torch.Tensor):
-		"""
-		Initializer for the reducer class.
-
-		:param input_features: The number of features of the input embeddings.
-		:param indices: The selected indices for the output features.
-		"""
-		if indices.shape[-1] > 1:
-			indices = indices.squeeze()
-		super().__init__(input_features, len(indices))
-		self._selected_features = indices.to(DEVICE)
-
-	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
-		return torch.index_select(input=embeddings.to(DEVICE), dim=self._FEATURES_AXIS, index=self._selected_features).to(DEVICE)
-
-	def get_transformation_matrix(self) -> torch.Tensor:
-		matrix: torch.Tensor = torch.zeros(size=(self.in_dim, self.out_dim), dtype=torch.uint8).to(DEVICE)
-		for i, feature in enumerate(self._selected_features):
-			matrix[feature, i] = 1.0
-		return matrix
+from model.reduction.selection import SelectorReducer
 
 
 class WeightsSelectorReducer(SelectorReducer):

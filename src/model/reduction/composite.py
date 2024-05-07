@@ -24,13 +24,13 @@ class CompositeReducer(BaseDimensionalityReducer):
 		for i in range(1, len(reducers)):
 			assert reducers[i - 1].out_dim == reducers[i].in_dim, "The reducers must be compatible in size. Instead, the output of the reducer at index {} is {}, and the input of the reducer at index {} is {}.".format(i - 1, reducers[i - 1].out_dim, i,  reducers[i].in_dim)
 		self._reducers: list[BaseDimensionalityReducer] = reducers
-		super().__init__(reducers[0].in_dim, reducers[-1].out_dim)
+		super().__init__(reducers[0].in_dim, reducers[-1].out_dim, requires_training=False)
 
 	def _reduction_transformation(self, embeddings: torch.Tensor) -> torch.Tensor:
 		results: torch.Tensor = embeddings
 		for reducer in self._reducers:
 			print("\t> ", end='')
-			results = reducer.reduce(results)
+			results = reducer.reduce_embs(results)
 		return results
 
 	def get_transformation_matrix(self) -> torch.Tensor:

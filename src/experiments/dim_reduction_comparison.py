@@ -61,7 +61,7 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		# We start defining reducers to be compared
 		reducers: list[BaseDimensionalityReducer] = []
 		# Some of them will require a classifier trained on the protected property, thus we prepare it
-		classifier: AbstractClassifier = ClassifierFactory.create(self.configs)
+		classifier: AbstractClassifier = ClassifierFactory(self.configs).create()
 		classifier.train(prot_dataset)
 
 		# 0. No reduction: 768 --> 768
@@ -84,7 +84,7 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		reducer_1 = WeightsSelectorReducer.from_classifier(classifier, output_features=self.midstep)
 		reducers.append(CompositeReducer([
 			reducer_1,
-			self._get_classic_reducer(reducer_1.reduce(prot_embs), out_dim=2)
+			self._get_classic_reducer(reducer_1.reduce_embs(prot_embs), out_dim=2)
 		]))
 		
 		#####################
@@ -98,8 +98,8 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 			print(f"Reducing embeddings with {name}...")
 
 			# Reducing the embeddings
-			reduced_prot_embs: torch.Tensor = reducer.reduce(prot_embs)
-			reduced_ster_embs: torch.Tensor = reducer.reduce(ster_embs)
+			reduced_prot_embs: torch.Tensor = reducer.reduce_embs(prot_embs)
+			reduced_ster_embs: torch.Tensor = reducer.reduce_embs(ster_embs)
 
 			reduced_prot_embs_ds: Dataset = Dataset.from_dict({'embedding': reduced_prot_embs, 'value': prot_dataset['value']}).with_format('torch')
 			reduced_ster_embs_ds: Dataset = Dataset.from_dict({'embedding': reduced_ster_embs, 'value': ster_dataset['value']}).with_format('torch')
@@ -140,10 +140,10 @@ class DimensionalityReductionsComparisonExperiment(Experiment):
 		:param embeddings: The embeddings at the input of the reducer.
 		:return: A "classic" reducer.
 		"""
-		if self.configs[Parameter.REDUCTION_TYPE] == 'pca':
+		if self.configs[Parameter.REDUCTION_STRATEGY] == 'pca':
 			return TrainedPCAReducer(embeddings, output_features=out_dim)
-		elif self.configs[Parameter.REDUCTION_TYPE] == 'tsne':
+		elif self.configs[Parameter.REDUCTION_STRATEGY] == 'tsne':
 			in_dim = embeddings.shape[-1]
 			return TSNEReducer(input_features=in_dim, output_features=out_dim)
 		else:
-			raise ValueError(f"Invalid reduction type: {self.configs[Parameter.REDUCTION_TYPE]}")
+			raise ValueError(f"Invalid reduction type: {self.configs[Parameter.REDUCTION_STRATEGY]}")

@@ -19,6 +19,10 @@ from utils.caching.creation import PropertyDataReference, get_cached_embeddings,
 from utils.config import Configurations
 from utils import file_system as fs
 
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
 REBUILD = False
 
 
@@ -370,12 +374,13 @@ class ResultCollector:
 		self.__results: Dataset = None
 
 	
-	def collect(self, current_configs: Configurations, results: dict[str, Any]) -> None:
+	def collect(self, current_configs: Configurations, results: dict[str, Any], remove_list_parameters: bool=False) -> None:
 		"""
 		Collects the results of the experiment.
 
 		:param current_configs: The current configurations of the experiment with which the results were obtained.
 		:param results: The results of the experiment.
+		:param remove_list_parameters: If True, the configurations with list values will be removed from the results.
 		"""
 		# We analyse the structure of the results to understand how to collect them
 		are_results_list: bool = True
@@ -398,7 +403,11 @@ class ResultCollector:
 		current_results_dict[self.EXPERIMENT_NAME_COL] = [self.__experiment.name] * results_len
 		# Now we add the configurations to the dictionary, such that each config_key is associated to a list
 		for key in current_configs.keys:
-			current_results_dict[key.value] = [current_configs[key]] * results_len
+			config_value = current_configs[key]
+			# If the value is a list, we remove it if required
+			if remove_list_parameters and isinstance(current_configs[key], list) or isinstance(current_configs[key], tuple):
+				config_value = None
+			current_results_dict[key.value] = [config_value] * results_len
 		# Ad then we add the results to the dictionary
 		for key in results.keys():
 			if are_results_list:
@@ -410,7 +419,13 @@ class ResultCollector:
 		results_ds: Dataset = Dataset.from_dict(current_results_dict)
 		# We add the results to the internal results dataset
 		if self.__results:
-			self.__results = concatenate_datasets([self.__results, results_ds])
+			try:
+				self.__results = concatenate_datasets([self.__results, results_ds])
+			except:
+				ValueError
+				logger.error("An error occurred while concatenating the results datasets. The features cannot be aligned:\n" + 
+				f"\t\t> The original results have the following {len(self.__results.column_names)} columns: " + str(self.__results.column_names) + "\n" +
+				f"\t\t> The new results have the following {len(results_ds.column_names)} columns: " + str(results_ds.column_names))
 		else:
 			self.__results = results_ds
 	
