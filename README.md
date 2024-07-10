@@ -1,5 +1,5 @@
 # Weakly-Supervised Bias Detection
-This repository contains the code to perform the experimentation of Bias Detection on the base English BERT model. The code includes multiple experiments, investigating different features of the problem and implementing various techniques. Further information can be found in our paper *"Weakly-Supervised Detection of Discrimination Bias in Large Language Models"* by Dusi, Arici, Gerevini, Serina, and Putelli (currently under evaluation).
+This repository contains the code to perform the experimentation of Bias Detection on different pre-trained Transformers-based Language Models. The code includes multiple experiments, investigating different features of the problem and implementing various techniques. Further information can be found in our paper *"Discrimination Bias Detection through Categorical Association in Pre-trained Language Models"* by Dusi, Arici, Gerevini, Serina, and Putelli (currently under evaluation).
 
 ## Repository Structure
 - `data`: folder containing all the **input data for the experiments**. Documents are divided in two subfolders: `properties`, for datasets referring to a single property, and `crossed-evaluation`, with datasets referring to pairs of properties.
